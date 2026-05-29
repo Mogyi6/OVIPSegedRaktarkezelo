@@ -2,15 +2,21 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# project fájl másolás + restore (gyors cache miatt)
-COPY *.csproj ./
+# copy solution and project files (cache friendly)
+# build context is repository root, so these relative paths exist
+COPY *.sln ./
+COPY Logic/*.csproj Logic/
+COPY Models/*.csproj Models/
+COPY Repository/*.csproj Repository/
+COPY OVIP_Seged_Raktarkezelo/*.csproj OVIP_Seged_Raktarkezelo/
+
 RUN dotnet restore
 
-# teljes kód másolása
+# copy remaining sources
 COPY . .
 
-# publish
-RUN dotnet publish -c Release -o /app/publish
+# publish the specific project
+RUN dotnet publish OVIP_Seged_Raktarkezelo/OVIP_Seged_Raktarkezelo.csproj -c Release -o /app/publish
 
 # ---------- RUNTIME STAGE ----------
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
