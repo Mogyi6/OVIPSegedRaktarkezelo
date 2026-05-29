@@ -51,6 +51,7 @@ namespace Logic.Logic.SOAPClient
                         <user_id>{_options.UserId}</user_id>
                         <webshop_id>{_options.WebshopId}</webshop_id>
                         <signature>{signature}</signature>
+                        <ip_cim>{_options.CallerIp}</ip_cim>
                         {extraXml}
                         {limitFromXml}
                         {limitToXml}
