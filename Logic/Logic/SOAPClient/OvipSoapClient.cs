@@ -73,6 +73,10 @@ namespace Logic.Logic.SOAPClient
             var response = await _httpClient.SendAsync(requestMessage);
             var xml = await response.Content.ReadAsStringAsync();
 
+            // Log response details for debugging
+            System.Diagnostics.Debug.WriteLine(
+                $"OVIP SOAP Response - Status: {response.StatusCode}, ContentLength: {response.Content.Headers.ContentLength}, Body: {xml}");
+
             if (!response.IsSuccessStatusCode)
             {
                 throw new HttpRequestException(
@@ -82,7 +86,7 @@ namespace Logic.Logic.SOAPClient
             if (string.IsNullOrWhiteSpace(xml))
             {
                 throw new InvalidOperationException(
-                    "OVIP SOAP response was empty. The request body was: " + Environment.NewLine + soapXml);
+                    $"OVIP SOAP response was empty (Status: {response.StatusCode}). The request body was: " + Environment.NewLine + soapXml);
             }
 
             return ExtractReturnValue(xml);
