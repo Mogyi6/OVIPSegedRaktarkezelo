@@ -3,6 +3,7 @@ using Models.SOAPClient;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -63,10 +64,26 @@ namespace Logic.Logic.SOAPClient
 
             using var content = new StringContent(soapXml, Encoding.UTF8, "text/xml");
 
-            var response = await _httpClient.PostAsync(_options.BaseUrl, content);
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, _options.BaseUrl)
+            {
+                Content = content
+            };
+            requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/xml"));
+
+            var response = await _httpClient.SendAsync(requestMessage);
             var xml = await response.Content.ReadAsStringAsync();
 
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    $"OVIP SOAP call failed ({response.StatusCode}). Response body:\n{xml}");
+            }
+
+            if (string.IsNullOrWhiteSpace(xml))
+            {
+                throw new InvalidOperationException(
+                    "OVIP SOAP response was empty. The request body was: " + Environment.NewLine + soapXml);
+            }
 
             return ExtractReturnValue(xml);
         }
