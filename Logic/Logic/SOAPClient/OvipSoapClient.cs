@@ -42,33 +42,35 @@ namespace Logic.Logic.SOAPClient
                 ? $"<limit_to>{limitTo.Value}</limit_to>"
                 : "";
 
-            var soapXml = $"""
-        <?xml version="1.0" encoding="UTF-8"?>
-        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
-            <soapenv:Body>
-                <getRequest>
-                    <input>
-                        <request>{request}</request>
-                        <user_id>{_options.UserId}</user_id>
-                        <webshop_id>{_options.WebshopId}</webshop_id>
-                        <signature>{signature}</signature>
-                        <ip_cim>{_options.CallerIp}</ip_cim>
-                        {extraXml}
-                        {limitFromXml}
-                        {limitToXml}
-                    </input>
-                </getRequest>
-            </soapenv:Body>
-        </soapenv:Envelope>
-        """;
+            var soapXml = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<SOAP-ENV:Envelope 
+    xmlns:SOAP-ENV=""http://schemas.xmlsoap.org/soap/envelope/""
+    xmlns:ns1=""https://www.ovip.hu/webshopAPI"">
+  <SOAP-ENV:Body>
+    <ns1:getRequest>
+      <input>
+        <request>{request}</request>
+        <user_id>{_options.UserId}</user_id>
+        <webshop_id>{_options.WebshopId}</webshop_id>
+        <signature>{signature}</signature>
+        <ip_cim>{_options.CallerIp}</ip_cim>
+        {extraXml}
+        {limitFromXml}
+        {limitToXml}
+      </input>
+    </ns1:getRequest>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>";
 
             using var content = new StringContent(soapXml, Encoding.UTF8, "text/xml");
 
             using var requestMessage = new HttpRequestMessage(HttpMethod.Post, _options.BaseUrl)
-            {
-                Content = content
-            };
-            requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/xml"));
+{
+    Content = content
+};
+
+requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/xml"));
+requestMessage.Headers.Add("SOAPAction", "\"getRequest\"");
 
             var response = await _httpClient.SendAsync(requestMessage);
             var xml = await response.Content.ReadAsStringAsync();
