@@ -25,6 +25,7 @@ using Repository.Repository.PricingRepository;
 using Repository.Repository.PricingRepository.Interfaces;
 using Repository.Repository.ProductsRepository;
 using Repository.Repository.ProductsRepository.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 
 
@@ -124,6 +125,13 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// apply EF Core migrations on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<OvipDbContext>();
+    db.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 
