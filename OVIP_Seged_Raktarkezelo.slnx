@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Logic/Logic.csproj" />
+  <Project Path="Models/Models.csproj" />
+  <Project Path="OVIP_Seged_Raktarkezelo/OVIP_Seged_Raktarkezelo.csproj" />
+  <Project Path="Repository/Repository.csproj" />
+</Solution>

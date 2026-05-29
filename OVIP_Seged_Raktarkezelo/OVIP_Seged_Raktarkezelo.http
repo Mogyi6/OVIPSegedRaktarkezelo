@@ -1,0 +1,6 @@
+@OVIP_Seged_Raktarkezelo_HostAddress = http://localhost:5155
+
+GET {{OVIP_Seged_Raktarkezelo_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
