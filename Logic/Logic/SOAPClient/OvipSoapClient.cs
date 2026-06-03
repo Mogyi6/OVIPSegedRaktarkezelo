@@ -28,6 +28,10 @@ namespace Logic.Logic.SOAPClient
             int? limitFrom = null,
             int? limitTo = null)
         {
+            var escapedRequest = System.Security.SecurityElement.Escape(request);
+            var escapedUserId = System.Security.SecurityElement.Escape(_options.UserId);
+            var escapedWebshopId = System.Security.SecurityElement.Escape(_options.WebshopId);
+            var escapedCallerIp = System.Security.SecurityElement.Escape(_options.CallerIp);
             var signature = CreateSignature(request);
 
             var extraXml = extraData == null
@@ -49,11 +53,11 @@ namespace Logic.Logic.SOAPClient
   <SOAP-ENV:Body>
     <ns1:getRequest>
       <input>
-        <request>{request}</request>
-        <user_id>{_options.UserId}</user_id>
-        <webshop_id>{_options.WebshopId}</webshop_id>
+        <request>{escapedRequest}</request>
+        <user_id>{escapedUserId}</user_id>
+        <webshop_id>{escapedWebshopId}</webshop_id>
         <signature>{signature}</signature>
-        <ip_cim>{_options.CallerIp}</ip_cim>
+        <ip_cim>{escapedCallerIp}</ip_cim>
         {extraXml}
         {limitFromXml}
         {limitToXml}
