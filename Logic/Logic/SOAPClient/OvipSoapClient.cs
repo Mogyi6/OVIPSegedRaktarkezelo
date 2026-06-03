@@ -1,12 +1,8 @@
 ﻿using Microsoft.Extensions.Options;
 using Models.SOAPClient;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace Logic.Logic.SOAPClient
@@ -28,104 +24,323 @@ namespace Logic.Logic.SOAPClient
             int? limitFrom = null,
             int? limitTo = null)
         {
-            var escapedRequest = System.Security.SecurityElement.Escape(request);
-            var escapedUserId = System.Security.SecurityElement.Escape(_options.UserId);
-            var escapedWebshopId = System.Security.SecurityElement.Escape(_options.WebshopId);
-            var escapedCallerIp = System.Security.SecurityElement.Escape(_options.CallerIp);
-            var signature = CreateSignature(request);
+            var debug = new StringBuilder();
 
-            var extraXml = extraData == null
-                ? ""
-                : $"<extra_data>{System.Security.SecurityElement.Escape(extraData.ToString())}</extra_data>";
+            debug.AppendLine("========== OVIP SOAP DEBUG START ==========");
+            debug.AppendLine($"BaseUrl: {_options.BaseUrl}");
+            debug.AppendLine($"Request: {request}");
+            debug.AppendLine($"UserId: {_options.UserId}");
+            debug.AppendLine($"WebshopId: {_options.WebshopId}");
+            debug.AppendLine($"CallerIp: {_options.CallerIp}");
+            debug.AppendLine($"ExtraData: {extraData}");
+            debug.AppendLine($"LimitFrom: {limitFrom}");
+            debug.AppendLine($"LimitTo: {limitTo}");
 
-            var limitFromXml = limitFrom.HasValue
-                ? $"<limit_from>{limitFrom.Value}</limit_from>"
-                : "";
+            var signatureResult = CreateSignatureWithDebug(request);
+            var signature = signatureResult.Signature;
 
-            var limitToXml = limitTo.HasValue
-                ? $"<limit_to>{limitTo.Value}</limit_to>"
-                : "";
+            debug.AppendLine("---------- SIGNATURE ----------");
+            debug.AppendLine($"SignatureRaw: {signatureResult.Raw}");
+            debug.AppendLine($"SignatureSha256: {signature}");
 
-            var soapXml = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
-<SOAP-ENV:Envelope 
-    xmlns:SOAP-ENV=""http://schemas.xmlsoap.org/soap/envelope/""
-    xmlns:ns1=""https://www.ovip.hu/webshopAPI"">
-  <SOAP-ENV:Body>
-    <ns1:getRequest>
-      <input>
-        <request>{escapedRequest}</request>
-        <user_id>{escapedUserId}</user_id>
-        <webshop_id>{escapedWebshopId}</webshop_id>
-        <signature>{signature}</signature>
-        <ip_cim>{escapedCallerIp}</ip_cim>
-        {extraXml}
-        {limitFromXml}
-        {limitToXml}
-      </input>
-    </ns1:getRequest>
-  </SOAP-ENV:Body>
-</SOAP-ENV:Envelope>";
-
-            using var content = new StringContent(soapXml, Encoding.UTF8, "text/xml");
-
-            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, _options.BaseUrl)
+            var variants = new List<(string Name, string Xml, bool AddSoapAction)>
             {
-                Content = content
+                (
+                    "Variant 1 - no namespace on input fields, no SOAPAction",
+                    BuildSoapXmlSimple(request, signature, extraData, limitFrom, limitTo),
+                    false
+                ),
+                (
+                    "Variant 2 - namespace on input fields, no SOAPAction",
+                    BuildSoapXmlNamespacedInput(request, signature, extraData, limitFrom, limitTo),
+                    false
+                ),
+                (
+                    "Variant 3 - PHP SOAP array style, no SOAPAction",
+                    BuildSoapXmlPhpArrayStyle(request, signature, extraData, limitFrom, limitTo),
+                    false
+                ),
+                (
+                    "Variant 4 - simple XML with SOAPAction",
+                    BuildSoapXmlSimple(request, signature, extraData, limitFrom, limitTo),
+                    true
+                )
             };
 
-            requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/xml"));
-            requestMessage.Headers.Add("SOAPAction", "\"getRequest\"");
-
-            System.Diagnostics.Debug.WriteLine(
-                $"OVIP SOAP Request - input: {request}, signature: {signature}, extra_data: {extraXml}, limit_from: {limitFrom}, limit_to: {limitTo}" + Environment.NewLine + soapXml);
-
-            string xml;
-
-            try
+            foreach (var variant in variants)
             {
-                var response = await _httpClient.SendAsync(requestMessage);
-                xml = await response.Content.ReadAsStringAsync();
+                debug.AppendLine();
+                debug.AppendLine($"========== TRYING {variant.Name} ==========");
+                debug.AppendLine("Request XML:");
+                debug.AppendLine(variant.Xml);
 
-                System.Diagnostics.Debug.WriteLine(
-                    $"OVIP SOAP Response - Status: {response.StatusCode}, ContentLength: {response.Content.Headers.ContentLength}, Body: {xml}");
-
-                if (!response.IsSuccessStatusCode)
+                try
                 {
-                    throw new HttpRequestException(
-                        $"OVIP SOAP call failed ({response.StatusCode}). Response body:\n{xml}");
-                }
+                    using var content = new StringContent(variant.Xml, Encoding.UTF8, "text/xml");
 
-                if (string.IsNullOrWhiteSpace(xml))
+                    using var requestMessage = new HttpRequestMessage(HttpMethod.Post, _options.BaseUrl)
+                    {
+                        Content = content
+                    };
+
+                    requestMessage.Headers.Accept.Clear();
+                    requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+
+                    if (variant.AddSoapAction)
+                    {
+                        requestMessage.Headers.Add("SOAPAction", "\"getRequest\"");
+                    }
+
+                    debug.AppendLine("Request Headers:");
+                    foreach (var header in requestMessage.Headers)
+                    {
+                        debug.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
+                    }
+
+                    debug.AppendLine("Content Headers:");
+                    foreach (var header in content.Headers)
+                    {
+                        debug.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
+                    }
+
+                    var response = await _httpClient.SendAsync(requestMessage);
+                    var xml = await response.Content.ReadAsStringAsync();
+
+                    debug.AppendLine("Response:");
+                    debug.AppendLine($"StatusCode: {(int)response.StatusCode} {response.StatusCode}");
+                    debug.AppendLine($"IsSuccessStatusCode: {response.IsSuccessStatusCode}");
+                    debug.AppendLine($"ContentLength: {response.Content.Headers.ContentLength}");
+                    debug.AppendLine($"ContentType: {response.Content.Headers.ContentType}");
+
+                    debug.AppendLine("Response Headers:");
+                    foreach (var header in response.Headers)
+                    {
+                        debug.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
+                    }
+
+                    debug.AppendLine("Response Content Headers:");
+                    foreach (var header in response.Content.Headers)
+                    {
+                        debug.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
+                    }
+
+                    debug.AppendLine("Response Body:");
+                    debug.AppendLine(string.IsNullOrWhiteSpace(xml) ? "[EMPTY BODY]" : xml);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        debug.AppendLine($"Result: HTTP error in {variant.Name}, trying next variant...");
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(xml))
+                    {
+                        debug.AppendLine($"Result: Empty response in {variant.Name}, trying next variant...");
+                        continue;
+                    }
+
+                    var extracted = ExtractReturnValue(xml);
+
+                    debug.AppendLine("Extracted return value:");
+                    debug.AppendLine(extracted);
+                    debug.AppendLine("========== OVIP SOAP DEBUG END ==========");
+
+                    return extracted;
+                }
+                catch (Exception ex)
                 {
-                    throw new InvalidOperationException(
-                        $"OVIP SOAP response was empty (Status: {response.StatusCode}). The request body was: " + Environment.NewLine + soapXml);
+                    debug.AppendLine($"Exception in {variant.Name}:");
+                    debug.AppendLine(ex.ToString());
+                    debug.AppendLine("Trying next variant...");
                 }
             }
-            catch (Exception ex)
+
+            debug.AppendLine();
+            debug.AppendLine("========== FINAL RESULT ==========");
+            debug.AppendLine("All SOAP variants failed or returned empty response.");
+            debug.AppendLine("========== OVIP SOAP DEBUG END ==========");
+
+            throw new InvalidOperationException(debug.ToString());
+        }
+
+        private string BuildSoapXmlSimple(
+            string request,
+            string signature,
+            object? extraData,
+            int? limitFrom,
+            int? limitTo)
+        {
+            var nsEnv = "http://schemas.xmlsoap.org/soap/envelope/";
+            var ns1 = "https://www.ovip.hu/webshopAPI";
+
+            var input = new XElement("input",
+                new XElement("request", request),
+                new XElement("user_id", _options.UserId),
+                new XElement("webshop_id", _options.WebshopId),
+                new XElement("signature", signature),
+                new XElement("ip_cim", _options.CallerIp)
+            );
+
+            AddOptionalFields(input, extraData, limitFrom, limitTo);
+
+            var soapDoc = new XDocument(
+                new XDeclaration("1.0", "UTF-8", null),
+                new XElement(XName.Get("Envelope", nsEnv),
+                    new XAttribute(XNamespace.Xmlns + "SOAP-ENV", nsEnv),
+                    new XAttribute(XNamespace.Xmlns + "ns1", ns1),
+                    new XElement(XName.Get("Body", nsEnv),
+                        new XElement(XName.Get("getRequest", ns1), input)
+                    )
+                )
+            );
+
+            return soapDoc.ToString(SaveOptions.DisableFormatting);
+        }
+
+        private string BuildSoapXmlNamespacedInput(
+            string request,
+            string signature,
+            object? extraData,
+            int? limitFrom,
+            int? limitTo)
+        {
+            var nsEnv = "http://schemas.xmlsoap.org/soap/envelope/";
+            var ns1 = "https://www.ovip.hu/webshopAPI";
+
+            var input = new XElement(XName.Get("input", ns1),
+                new XElement(XName.Get("request", ns1), request),
+                new XElement(XName.Get("user_id", ns1), _options.UserId),
+                new XElement(XName.Get("webshop_id", ns1), _options.WebshopId),
+                new XElement(XName.Get("signature", ns1), signature),
+                new XElement(XName.Get("ip_cim", ns1), _options.CallerIp)
+            );
+
+            AddOptionalFields(input, extraData, limitFrom, limitTo, ns1);
+
+            var soapDoc = new XDocument(
+                new XDeclaration("1.0", "UTF-8", null),
+                new XElement(XName.Get("Envelope", nsEnv),
+                    new XAttribute(XNamespace.Xmlns + "SOAP-ENV", nsEnv),
+                    new XAttribute(XNamespace.Xmlns + "ns1", ns1),
+                    new XElement(XName.Get("Body", nsEnv),
+                        new XElement(XName.Get("getRequest", ns1), input)
+                    )
+                )
+            );
+
+            return soapDoc.ToString(SaveOptions.DisableFormatting);
+        }
+
+        private string BuildSoapXmlPhpArrayStyle(
+            string request,
+            string signature,
+            object? extraData,
+            int? limitFrom,
+            int? limitTo)
+        {
+            var nsEnv = "http://schemas.xmlsoap.org/soap/envelope/";
+            var ns1 = "https://www.ovip.hu/webshopAPI";
+            var soapEnc = "http://schemas.xmlsoap.org/soap/encoding/";
+            var xsi = "http://www.w3.org/2001/XMLSchema-instance";
+            var xsd = "http://www.w3.org/2001/XMLSchema";
+
+            var input = new XElement("input",
+                new XAttribute(XName.Get("type", xsi), "SOAP-ENC:Array"),
+                new XAttribute(XName.Get("arrayType", soapEnc), "xsd:anyType[5]"),
+                PhpItem("request", request),
+                PhpItem("user_id", _options.UserId),
+                PhpItem("webshop_id", _options.WebshopId),
+                PhpItem("signature", signature),
+                PhpItem("ip_cim", _options.CallerIp)
+            );
+
+            var optionalCount = 0;
+
+            if (extraData != null)
             {
-                var errorMessage = $"OVIP SOAP request failed. Request XML:\n{soapXml}\nException: {ex}";
-                System.Diagnostics.Debug.WriteLine(errorMessage);
-                throw new InvalidOperationException(errorMessage, ex);
+                input.Add(PhpItem("extra_data", extraData.ToString() ?? ""));
+                optionalCount++;
             }
 
-            try
+            if (limitFrom.HasValue)
             {
-                return ExtractReturnValue(xml);
+                input.Add(PhpItem("limit_from", limitFrom.Value.ToString()));
+                optionalCount++;
             }
-            catch (Exception ex)
+
+            if (limitTo.HasValue)
             {
-                var errorMessage = $"OVIP SOAP response parsing failed. Request XML:\n{soapXml}\nResponse XML:\n{xml}\nException: {ex}";
-                System.Diagnostics.Debug.WriteLine(errorMessage);
-                throw new InvalidOperationException(errorMessage, ex);
+                input.Add(PhpItem("limit_to", limitTo.Value.ToString()));
+                optionalCount++;
+            }
+
+            input.SetAttributeValue(XName.Get("arrayType", soapEnc), $"xsd:anyType[{5 + optionalCount}]");
+
+            var soapDoc = new XDocument(
+                new XDeclaration("1.0", "UTF-8", null),
+                new XElement(XName.Get("Envelope", nsEnv),
+                    new XAttribute(XNamespace.Xmlns + "SOAP-ENV", nsEnv),
+                    new XAttribute(XNamespace.Xmlns + "ns1", ns1),
+                    new XAttribute(XNamespace.Xmlns + "SOAP-ENC", soapEnc),
+                    new XAttribute(XNamespace.Xmlns + "xsi", xsi),
+                    new XAttribute(XNamespace.Xmlns + "xsd", xsd),
+                    new XElement(XName.Get("Body", nsEnv),
+                        new XElement(XName.Get("getRequest", ns1), input)
+                    )
+                )
+            );
+
+            return soapDoc.ToString(SaveOptions.DisableFormatting);
+        }
+
+        private static XElement PhpItem(string key, string value)
+        {
+            var xsi = "http://www.w3.org/2001/XMLSchema-instance";
+
+            return new XElement("item",
+                new XElement("key", key),
+                new XElement("value",
+                    new XAttribute(XName.Get("type", xsi), "xsd:string"),
+                    value
+                )
+            );
+        }
+
+        private void AddOptionalFields(
+            XElement input,
+            object? extraData,
+            int? limitFrom,
+            int? limitTo,
+            string? ns = null)
+        {
+            XName Name(string name)
+            {
+                return ns == null ? name : XName.Get(name, ns);
+            }
+
+            if (extraData != null)
+            {
+                input.Add(new XElement(Name("extra_data"), extraData.ToString()));
+            }
+
+            if (limitFrom.HasValue)
+            {
+                input.Add(new XElement(Name("limit_from"), limitFrom.Value));
+            }
+
+            if (limitTo.HasValue)
+            {
+                input.Add(new XElement(Name("limit_to"), limitTo.Value));
             }
         }
 
-        private string CreateSignature(string request)
+        private (string Raw, string Signature) CreateSignatureWithDebug(string request)
         {
             var raw = $"{_options.UserId}{_options.WebshopId}{_options.AuthCode}{request}{_options.CallerIp}";
             var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+            var signature = Convert.ToHexString(hash).ToLower();
 
-            return Convert.ToHexString(hash).ToLower();
+            return (raw, signature);
         }
 
         private static string ExtractReturnValue(string xml)
