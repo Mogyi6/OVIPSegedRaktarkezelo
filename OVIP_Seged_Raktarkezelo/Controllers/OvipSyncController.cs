@@ -17,12 +17,24 @@ namespace OVIP_Seged_Raktarkezelo.Controllers
         [HttpPost("all")]
         public async Task<IActionResult> SyncAll()
         {
-            await _ovipSyncLogic.SyncAllAsync();
-
-            return Ok(new
+            try
             {
-                message = "OVIP teljes szinkron sikeresen lefutott."
-            });
+                await _ovipSyncLogic.SyncAllAsync();
+
+                return Ok(new
+                {
+                    message = "OVIP teljes szinkron sikeresen lefutott."
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = "OVIP szinkron hiba történt.",
+                    error = ex.Message,
+                    exception = ex.GetType().Name
+                });
+            }
         }
     }
 }

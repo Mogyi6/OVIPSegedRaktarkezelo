@@ -65,33 +65,55 @@ namespace Logic.Logic.SOAPClient
             using var content = new StringContent(soapXml, Encoding.UTF8, "text/xml");
 
             using var requestMessage = new HttpRequestMessage(HttpMethod.Post, _options.BaseUrl)
-{
-    Content = content
-};
+            {
+                Content = content
+            };
 
-requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/xml"));
-requestMessage.Headers.Add("SOAPAction", "\"getRequest\"");
+            requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/xml"));
+            requestMessage.Headers.Add("SOAPAction", "\"getRequest\"");
 
-            var response = await _httpClient.SendAsync(requestMessage);
-            var xml = await response.Content.ReadAsStringAsync();
-
-            // Log response details for debugging
             System.Diagnostics.Debug.WriteLine(
-                $"OVIP SOAP Response - Status: {response.StatusCode}, ContentLength: {response.Content.Headers.ContentLength}, Body: {xml}");
+                $"OVIP SOAP Request - input: {request}, signature: {signature}, extra_data: {extraXml}, limit_from: {limitFrom}, limit_to: {limitTo}" + Environment.NewLine + soapXml);
 
-            if (!response.IsSuccessStatusCode)
+            string xml;
+
+            try
             {
-                throw new HttpRequestException(
-                    $"OVIP SOAP call failed ({response.StatusCode}). Response body:\n{xml}");
+                var response = await _httpClient.SendAsync(requestMessage);
+                xml = await response.Content.ReadAsStringAsync();
+
+                System.Diagnostics.Debug.WriteLine(
+                    $"OVIP SOAP Response - Status: {response.StatusCode}, ContentLength: {response.Content.Headers.ContentLength}, Body: {xml}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        $"OVIP SOAP call failed ({response.StatusCode}). Response body:\n{xml}");
+                }
+
+                if (string.IsNullOrWhiteSpace(xml))
+                {
+                    throw new InvalidOperationException(
+                        $"OVIP SOAP response was empty (Status: {response.StatusCode}). The request body was: " + Environment.NewLine + soapXml);
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"OVIP SOAP request failed. Request XML:\n{soapXml}\nException: {ex}";
+                System.Diagnostics.Debug.WriteLine(errorMessage);
+                throw new InvalidOperationException(errorMessage, ex);
             }
 
-            if (string.IsNullOrWhiteSpace(xml))
+            try
             {
-                throw new InvalidOperationException(
-                    $"OVIP SOAP response was empty (Status: {response.StatusCode}). The request body was: " + Environment.NewLine + soapXml);
+                return ExtractReturnValue(xml);
             }
-
-            return ExtractReturnValue(xml);
+            catch (Exception ex)
+            {
+                var errorMessage = $"OVIP SOAP response parsing failed. Request XML:\n{soapXml}\nResponse XML:\n{xml}\nException: {ex}";
+                System.Diagnostics.Debug.WriteLine(errorMessage);
+                throw new InvalidOperationException(errorMessage, ex);
+            }
         }
 
         private string CreateSignature(string request)
