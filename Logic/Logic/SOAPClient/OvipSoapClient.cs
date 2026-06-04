@@ -27,7 +27,10 @@ namespace Logic.Logic.SOAPClient
             var debug = new StringBuilder();
 
             var soapLink = NormalizeSoapLink(_options.BaseUrl);
-            var signatureBase = $"{_options.UserId}{_options.WebshopId}{_options.AuthCode}{request}{_options.CallerIp}".Trim();
+
+            var signatureBase =
+                $"{_options.UserId}{_options.WebshopId}{_options.AuthCode}{request}{_options.CallerIp}".Trim();
+
             var signature = Sha256Hex(signatureBase);
 
             var soapXml = BuildPhpArraySoapEnvelope(
@@ -38,8 +41,7 @@ namespace Logic.Logic.SOAPClient
                 _options.WebshopId,
                 extraData,
                 limitFrom,
-                limitTo,
-                _options.CallerIp
+                limitTo
             );
 
             debug.AppendLine("========== OVIP SOAP DEBUG START ==========");
@@ -114,9 +116,7 @@ namespace Logic.Logic.SOAPClient
                 debug.AppendLine(string.IsNullOrWhiteSpace(body) ? "[EMPTY BODY]" : body);
 
                 if (!response.IsSuccessStatusCode)
-                {
                     throw new InvalidOperationException(debug.ToString());
-                }
 
                 if (string.IsNullOrWhiteSpace(body))
                 {
@@ -145,7 +145,7 @@ namespace Logic.Logic.SOAPClient
         private static string NormalizeSoapLink(string? baseUrl)
         {
             var url = string.IsNullOrWhiteSpace(baseUrl)
-                ? "https://www.ovip.hu/webshopAPI/"
+                ? "https://www.ovip.innovip.hu/webshopAPI/"
                 : baseUrl.Trim();
 
             if (!url.EndsWith("/"))
@@ -162,8 +162,7 @@ namespace Logic.Logic.SOAPClient
             string webshopId,
             object? extraData,
             int? limitFrom,
-            int? limitTo,
-            string? callerIp = null)
+            int? limitTo)
         {
             var items = new List<(string Key, string Value)>
             {
@@ -172,9 +171,6 @@ namespace Logic.Logic.SOAPClient
                 ("signature", signature),
                 ("webshop_id", webshopId)
             };
-
-            if (!string.IsNullOrWhiteSpace(callerIp))
-                items.Add(("ip_cim", callerIp));
 
             if (extraData != null)
                 items.Add(("extra_data", extraData.ToString() ?? ""));
