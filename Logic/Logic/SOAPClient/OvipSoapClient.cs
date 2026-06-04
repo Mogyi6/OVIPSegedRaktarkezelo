@@ -43,27 +43,37 @@ namespace Logic.Logic.SOAPClient
             debug.AppendLine($"SignatureRaw: {signatureResult.Raw}");
             debug.AppendLine($"SignatureSha256: {signature}");
 
-            var variants = new List<(string Name, string Xml, bool AddSoapAction)>
+            var variants = new List<(string Name, string Xml, string? SoapAction, string? Accept)>
             {
                 (
                     "Variant 1 - no namespace on input fields, no SOAPAction",
                     BuildSoapXmlSimple(request, signature, extraData, limitFrom, limitTo),
-                    false
+                    null,
+                    null
                 ),
                 (
                     "Variant 2 - namespace on input fields, no SOAPAction",
                     BuildSoapXmlNamespacedInput(request, signature, extraData, limitFrom, limitTo),
-                    false
+                    null,
+                    null
                 ),
                 (
                     "Variant 3 - PHP SOAP array style, no SOAPAction",
                     BuildSoapXmlPhpArrayStyle(request, signature, extraData, limitFrom, limitTo),
-                    false
+                    null,
+                    null
                 ),
                 (
                     "Variant 4 - simple XML with SOAPAction",
                     BuildSoapXmlSimple(request, signature, extraData, limitFrom, limitTo),
-                    true
+                    "\"getRequest\"",
+                    "*/*"
+                ),
+                (
+                    "Variant 5 - param0 SOAP-ENC Struct with SOAPAction",
+                    BuildSoapXmlParam0(request, signature, extraData, limitFrom, limitTo),
+                    _options.BaseUrl?.TrimEnd('/') + "#getRequest",
+                    "text/xml, application/xml, */*"
                 )
             };
 
@@ -84,11 +94,22 @@ namespace Logic.Logic.SOAPClient
                     };
 
                     requestMessage.Headers.Accept.Clear();
-                    requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-
-                    if (variant.AddSoapAction)
+                    if (!string.IsNullOrWhiteSpace(variant.Accept))
                     {
-                        requestMessage.Headers.Add("SOAPAction", "\"getRequest\"");
+                        requestMessage.Headers.TryAddWithoutValidation("Accept", variant.Accept);
+                    }
+                    else
+                    {
+                        requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(variant.SoapAction))
+                    {
+                        var soapActionValue = variant.SoapAction!.StartsWith("\"") && variant.SoapAction.EndsWith("\"")
+                            ? variant.SoapAction
+                            : "\"" + variant.SoapAction + "\"";
+
+                        requestMessage.Headers.TryAddWithoutValidation("SOAPAction", soapActionValue);
                     }
 
                     debug.AppendLine("Request Headers:");
@@ -286,6 +307,67 @@ namespace Logic.Logic.SOAPClient
                     new XAttribute(XNamespace.Xmlns + "xsd", xsd),
                     new XElement(XName.Get("Body", nsEnv),
                         new XElement(XName.Get("getRequest", ns1), input)
+                    )
+                )
+            );
+
+            return soapDoc.ToString(SaveOptions.DisableFormatting);
+        }
+
+        private string BuildSoapXmlParam0(
+            string request,
+            string signature,
+            object? extraData,
+            int? limitFrom,
+            int? limitTo)
+        {
+            var nsEnv = "http://schemas.xmlsoap.org/soap/envelope/";
+            var ns1 = _options.BaseUrl?.TrimEnd('/') ?? "https://www.ovip.hu/webshopAPI";
+            var soapEnc = "http://schemas.xmlsoap.org/soap/encoding/";
+            var xsi = "http://www.w3.org/2001/XMLSchema-instance";
+            var xsd = "http://www.w3.org/2001/XMLSchema";
+
+            var param0 = new XElement(XName.Get("param0", ns1),
+                new XAttribute(XName.Get("type", xsi), "SOAP-ENC:Struct"),
+                new XElement(XName.Get("request", ns1),
+                    new XAttribute(XName.Get("type", xsi), "xsd:string"), request),
+                new XElement(XName.Get("user_id", ns1),
+                    new XAttribute(XName.Get("type", xsi), "xsd:string"), _options.UserId),
+                new XElement(XName.Get("signature", ns1),
+                    new XAttribute(XName.Get("type", xsi), "xsd:string"), signature),
+                new XElement(XName.Get("webshop_id", ns1),
+                    new XAttribute(XName.Get("type", xsi), "xsd:string"), _options.WebshopId)
+            );
+
+            if (extraData != null)
+            {
+                param0.Add(new XElement(XName.Get("extra_data", ns1),
+                    new XAttribute(XName.Get("type", xsi), "xsd:string"), extraData.ToString()));
+            }
+
+            if (limitFrom.HasValue)
+            {
+                param0.Add(new XElement(XName.Get("limit_from", ns1),
+                    new XAttribute(XName.Get("type", xsi), "xsd:string"), limitFrom.Value.ToString()));
+            }
+
+            if (limitTo.HasValue)
+            {
+                param0.Add(new XElement(XName.Get("limit_to", ns1),
+                    new XAttribute(XName.Get("type", xsi), "xsd:string"), limitTo.Value.ToString()));
+            }
+
+            var soapDoc = new XDocument(
+                new XDeclaration("1.0", "UTF-8", null),
+                new XElement(XName.Get("Envelope", nsEnv),
+                    new XAttribute(XNamespace.Xmlns + "SOAP-ENV", nsEnv),
+                    new XAttribute(XNamespace.Xmlns + "ns1", ns1),
+                    new XAttribute(XNamespace.Xmlns + "SOAP-ENC", soapEnc),
+                    new XAttribute(XNamespace.Xmlns + "xsi", xsi),
+                    new XAttribute(XNamespace.Xmlns + "xsd", xsd),
+                    new XAttribute(XName.Get("encodingStyle", nsEnv), soapEnc),
+                    new XElement(XName.Get("Body", nsEnv),
+                        new XElement(XName.Get("getRequest", ns1), param0)
                     )
                 )
             );
