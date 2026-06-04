@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Options;
 using Models.SOAPClient;
-using System.Net.Http.Headers;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text;
@@ -31,7 +30,7 @@ namespace Logic.Logic.SOAPClient
             var signatureBase = $"{_options.UserId}{_options.WebshopId}{_options.AuthCode}{request}{_options.CallerIp}".Trim();
             var signature = Sha256Hex(signatureBase);
 
-            var soapEnvelope = BuildOvipOfficialSoapEnvelope(
+            var soapXml = BuildPhpArraySoapEnvelope(
                 soapLink,
                 request,
                 _options.UserId,
@@ -55,44 +54,42 @@ namespace Logic.Logic.SOAPClient
             debug.AppendLine($"SignatureBase: {signatureBase}");
             debug.AppendLine($"SignatureSha256: {signature}");
             debug.AppendLine("---------- REQUEST XML ----------");
-            debug.AppendLine(soapEnvelope);
+            debug.AppendLine(soapXml);
 
             try
             {
-                using var requestMessage = new HttpRequestMessage(HttpMethod.Post, soapLink);
+                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, soapLink);
 
-                requestMessage.Content = new StringContent(
-                    soapEnvelope,
+                httpRequest.Content = new StringContent(
+                    soapXml,
                     Encoding.UTF8,
                     "text/xml"
                 );
 
-                requestMessage.Headers.TryAddWithoutValidation(
+                httpRequest.Headers.TryAddWithoutValidation(
                     "SOAPAction",
                     $"\"{soapLink}#getRequest\""
                 );
 
-                requestMessage.Headers.TryAddWithoutValidation(
+                httpRequest.Headers.TryAddWithoutValidation(
                     "Accept",
                     "text/xml, application/xml, */*"
                 );
 
                 debug.AppendLine("---------- REQUEST HEADERS ----------");
-
-                foreach (var header in requestMessage.Headers)
+                foreach (var header in httpRequest.Headers)
                 {
                     debug.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
                 }
 
                 debug.AppendLine("---------- CONTENT HEADERS ----------");
-
-                foreach (var header in requestMessage.Content.Headers)
+                foreach (var header in httpRequest.Content.Headers)
                 {
                     debug.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
                 }
 
-                var response = await _httpClient.SendAsync(requestMessage);
-                var responseBody = await response.Content.ReadAsStringAsync();
+                var response = await _httpClient.SendAsync(httpRequest);
+                var body = await response.Content.ReadAsStringAsync();
 
                 debug.AppendLine("---------- RESPONSE ----------");
                 debug.AppendLine($"StatusCode: {(int)response.StatusCode} {response.StatusCode}");
@@ -100,45 +97,35 @@ namespace Logic.Logic.SOAPClient
                 debug.AppendLine($"ContentLength: {response.Content.Headers.ContentLength}");
                 debug.AppendLine($"ContentType: {response.Content.Headers.ContentType}");
 
-                if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400)
-                {
-                    debug.AppendLine("Redirect történt!");
-                    debug.AppendLine($"Location: {response.Headers.Location}");
-                }
-
                 debug.AppendLine("---------- RESPONSE HEADERS ----------");
-
                 foreach (var header in response.Headers)
                 {
                     debug.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
                 }
 
                 debug.AppendLine("---------- RESPONSE CONTENT HEADERS ----------");
-
                 foreach (var header in response.Content.Headers)
                 {
                     debug.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
                 }
 
                 debug.AppendLine("---------- RESPONSE BODY ----------");
-                debug.AppendLine(string.IsNullOrWhiteSpace(responseBody) ? "[EMPTY BODY]" : responseBody);
+                debug.AppendLine(string.IsNullOrWhiteSpace(body) ? "[EMPTY BODY]" : body);
 
                 if (!response.IsSuccessStatusCode)
                 {
                     throw new InvalidOperationException(debug.ToString());
                 }
 
-                if (string.IsNullOrWhiteSpace(responseBody))
+                if (string.IsNullOrWhiteSpace(body))
                 {
-                    debug.AppendLine("---------- RESULT ----------");
-                    debug.AppendLine("Az OVIP HTTP 200 OK választ adott, de a body üres.");
-                    debug.AppendLine("Ez általában OVIP oldali aktiválási/IP/AuthCode/Webshop beállítási gond.");
+                    debug.AppendLine("OVIP üres választ adott.");
                     throw new InvalidOperationException(debug.ToString());
                 }
 
-                var extracted = ExtractReturnValue(responseBody);
+                var extracted = ExtractReturnValue(body);
 
-                debug.AppendLine("---------- EXTRACTED RETURN VALUE ----------");
+                debug.AppendLine("---------- EXTRACTED ----------");
                 debug.AppendLine(extracted);
                 debug.AppendLine("========== OVIP SOAP DEBUG END ==========");
 
@@ -161,14 +148,12 @@ namespace Logic.Logic.SOAPClient
                 : baseUrl.Trim();
 
             if (!url.EndsWith("/"))
-            {
                 url += "/";
-            }
 
             return url;
         }
 
-        private static string BuildOvipOfficialSoapEnvelope(
+        private static string BuildPhpArraySoapEnvelope(
             string soapLink,
             string request,
             string userId,
@@ -178,45 +163,47 @@ namespace Logic.Logic.SOAPClient
             int? limitFrom,
             int? limitTo)
         {
-            var xmlSoapLink = SecurityElement.Escape(soapLink);
-            var xmlRequest = SecurityElement.Escape(request);
-            var xmlUserId = SecurityElement.Escape(userId);
-            var xmlSignature = SecurityElement.Escape(signature);
-            var xmlWebshopId = SecurityElement.Escape(webshopId);
-
-            var optionalXml = new StringBuilder();
+            var items = new List<(string Key, string Value)>
+            {
+                ("request", request),
+                ("user_id", userId),
+                ("signature", signature),
+                ("webshop_id", webshopId)
+            };
 
             if (extraData != null)
-            {
-                optionalXml.AppendLine($@"                <extra_data xsi:type=""xsd:string"">{SecurityElement.Escape(extraData.ToString())}</extra_data>");
-            }
+                items.Add(("extra_data", extraData.ToString() ?? ""));
 
             if (limitFrom.HasValue)
-            {
-                optionalXml.AppendLine($@"                <limit_from xsi:type=""xsd:string"">{limitFrom.Value}</limit_from>");
-            }
+                items.Add(("limit_from", limitFrom.Value.ToString()));
 
             if (limitTo.HasValue)
+                items.Add(("limit_to", limitTo.Value.ToString()));
+
+            var itemXml = new StringBuilder();
+
+            foreach (var item in items)
             {
-                optionalXml.AppendLine($@"                <limit_to xsi:type=""xsd:string"">{limitTo.Value}</limit_to>");
+                itemXml.AppendLine($@"
+                <item>
+                    <key xsi:type=""xsd:string"">{SecurityElement.Escape(item.Key)}</key>
+                    <value xsi:type=""xsd:string"">{SecurityElement.Escape(item.Value)}</value>
+                </item>");
             }
 
             return $@"<?xml version=""1.0"" encoding=""UTF-8""?>
 <SOAP-ENV:Envelope 
     xmlns:SOAP-ENV=""http://schemas.xmlsoap.org/soap/envelope/""
-    xmlns:ns1=""{xmlSoapLink}""
+    xmlns:ns1=""{SecurityElement.Escape(soapLink)}""
     xmlns:xsd=""http://www.w3.org/2001/XMLSchema""
     xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""
     xmlns:SOAP-ENC=""http://schemas.xmlsoap.org/soap/encoding/""
     SOAP-ENV:encodingStyle=""http://schemas.xmlsoap.org/soap/encoding/"">
     <SOAP-ENV:Body>
         <ns1:getRequest>
-            <param0 xsi:type=""SOAP-ENC:Struct"">
-                <request xsi:type=""xsd:string"">{xmlRequest}</request>
-                <user_id xsi:type=""xsd:string"">{xmlUserId}</user_id>
-                <signature xsi:type=""xsd:string"">{xmlSignature}</signature>
-                <webshop_id xsi:type=""xsd:string"">{xmlWebshopId}</webshop_id>
-{optionalXml}            </param0>
+            <param0 xsi:type=""SOAP-ENC:Array"" SOAP-ENC:arrayType=""xsd:anyType[{items.Count}]"">
+{itemXml}
+            </param0>
         </ns1:getRequest>
     </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>";
@@ -224,15 +211,11 @@ namespace Logic.Logic.SOAPClient
 
         private static string Sha256Hex(string input)
         {
-            var bytes = Encoding.UTF8.GetBytes(input);
-            var hash = SHA256.HashData(bytes);
-
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
             var sb = new StringBuilder();
 
             foreach (var b in hash)
-            {
                 sb.Append(b.ToString("x2"));
-            }
 
             return sb.ToString();
         }
