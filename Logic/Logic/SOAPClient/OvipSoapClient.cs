@@ -38,7 +38,8 @@ namespace Logic.Logic.SOAPClient
                 _options.WebshopId,
                 extraData,
                 limitFrom,
-                limitTo
+                limitTo,
+                _options.CallerIp
             );
 
             debug.AppendLine("========== OVIP SOAP DEBUG START ==========");
@@ -161,7 +162,8 @@ namespace Logic.Logic.SOAPClient
             string webshopId,
             object? extraData,
             int? limitFrom,
-            int? limitTo)
+            int? limitTo,
+            string? callerIp = null)
         {
             var items = new List<(string Key, string Value)>
             {
@@ -170,6 +172,9 @@ namespace Logic.Logic.SOAPClient
                 ("signature", signature),
                 ("webshop_id", webshopId)
             };
+
+            if (!string.IsNullOrWhiteSpace(callerIp))
+                items.Add(("ip_cim", callerIp));
 
             if (extraData != null)
                 items.Add(("extra_data", extraData.ToString() ?? ""));
