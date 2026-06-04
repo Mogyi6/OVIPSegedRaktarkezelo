@@ -50,7 +50,7 @@ namespace OVIP_Seged_Raktarkezelo.Controllers
         [HttpGet("categories/raw-custom")]
         public async Task<IActionResult> GetCategoriesRawCustom()
         {
-            var soapLink = _ovipOptions.BaseUrl.TrimEnd('/');
+            var soapLink = _ovipOptions.BaseUrl.TrimEnd('/') + "/";
             var request = "getCategories";
             var signatureBase = ($"{_ovipOptions.UserId}{_ovipOptions.WebshopId}{_ovipOptions.AuthCode}{request}{_ovipOptions.CallerIp}").Trim();
             var signature = Sha256Hex(signatureBase);
