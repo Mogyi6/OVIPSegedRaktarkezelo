@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace OVIP_Seged_Raktarkezelo.Controllers.OvipProxies
@@ -8,16 +7,11 @@ namespace OVIP_Seged_Raktarkezelo.Controllers.OvipProxies
     [Route("api/ovip/getParams")]
     public class GetParamsController : ControllerBase
     {
-        private const string PhpProxyBase = "http://72.60.176.243:5000/";
-
         [HttpGet]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> Get([FromServices] Logic.Logic.Sync.IOvipSyncLogic syncLogic)
         {
-            var url = PhpProxyBase + "?request=getParams";
-            using var client = new HttpClient();
-            var resp = await client.GetAsync(url);
-            var body = await resp.Content.ReadAsStringAsync();
-            return Content(body, "application/json");
+            var resultJson = await syncLogic.SyncParametersAsync();
+            return Content(resultJson, "application/json");
         }
     }
 }

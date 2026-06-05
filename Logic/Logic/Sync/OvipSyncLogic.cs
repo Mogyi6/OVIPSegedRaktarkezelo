@@ -71,9 +71,9 @@ namespace Logic.Logic.Sync
             await SyncManufacturesAsync();
         }
 
-        private async Task SyncCategoriesAsync()
+        public async Task<string> SyncCategoriesAsync()
         {
-            var json = await FetchFromPhpAsync("getCategories");
+            var json = await CallPhpProxyAsync("getCategories");
             var items = Deserialize<List<OvipCategoryRemoteDto>>(json);
 
             var existingCategories = await _categoryLogic.GetAllAsync();
@@ -112,11 +112,12 @@ namespace Logic.Logic.Sync
                     });
                 }
             }
+            return json;
         }
 
-        private async Task SyncParametersAsync()
+        public async Task<string> SyncParametersAsync()
         {
-            var json = await FetchFromPhpAsync("getParams");
+            var json = await CallPhpProxyAsync("getParams");
             var items = Deserialize<List<OvipParameterRemoteDto>>(json);
 
             var existingParameters = await _parameterLogic.GetAllAsync();
@@ -143,11 +144,12 @@ namespace Logic.Logic.Sync
                     });
                 }
             }
+            return json;
         }
 
-        private async Task SyncPriceListsAsync()
+        public async Task<string> SyncPriceListsAsync()
         {
-            var json = await FetchFromPhpAsync("getPricelist");
+            var json = await CallPhpProxyAsync("getPricelist");
             var items = Deserialize<List<OvipPriceListRemoteDto>>(json);
 
             var existingPriceLists = await _priceListLogic.GetAllAsync();
@@ -174,25 +176,135 @@ namespace Logic.Logic.Sync
                     });
                 }
             }
+            return json;
         }
 
-        private async Task SyncProductsAsync()
+        public async Task<string> SyncProductsAsync(string? extraData = null, int? limitFrom = null, int? limitTo = null)
         {
-            var limitFrom = 0;
-            var limitTo = 10000;
+            if (limitFrom.HasValue || limitTo.HasValue || !string.IsNullOrEmpty(extraData))
+            {
+                var json = await CallPhpProxyAsync(
+                    request: "getProducts",
+                    extraData: extraData,
+                    limitFrom: limitFrom,
+                    limitTo: limitTo);
+
+                var products = Deserialize<List<OvipProductRemoteDto>>(json);
+                var existingProducts = await _productLogic.GetAllAsync();
+
+                foreach (var item in products)
+                {
+                    var existing = existingProducts
+                        .FirstOrDefault(x => x.OvipProductId == item.ovip_product_id);
+
+                    if (existing == null)
+                    {
+                        await _productLogic.CreateAsync(new OvipProductCreateDto
+                        {
+                            OvipProductId = item.ovip_product_id,
+                            Name = item.name ?? string.Empty,
+                            Sku = item.sku ?? string.Empty,
+                            ManufactureSku = item.manufacture_sku,
+                            Barcode = item.bar_code,
+                            Manufacturer = item.manufacturer,
+
+                            WebshopVisible = item.webshop_visible == 1,
+                            Orderable = item.orderable ?? 0,
+
+                            ShortDescription = item.short_description,
+                            LongDescription = item.long_description,
+                            SeoTitle = item.seo_title,
+                            SeoDescription = item.seo_description,
+
+                            NetWeight = item.net_weight,
+                            GrossWeight = item.gross_weight,
+                            Width = item.width,
+                            Height = item.height,
+                            Length = item.length,
+
+                            Unit = item.unit,
+                            AltUnit = item.alt_unit,
+                            AltUnitQuantity = item.alt_unit_quantity,
+                            ProductUnitQuantity = item.product_unit_quantity,
+
+                            NetPrice = item.net_price ?? 0,
+                            GrossPrice = item.gross_price ?? 0,
+                            Tax = item.tax ?? 0,
+
+                            NetSalePrice = item.net_sale_price,
+                            GrossSalePrice = item.gross_sale_price,
+                            SaleStart = item.sale_start,
+                            SaleEnd = item.sale_end,
+
+                            OvipCategoryId = item.ovip_category_id ?? 0
+                        });
+                    }
+                    else
+                    {
+                        await _productLogic.UpdateAsync(new OvipProductUpdateDto
+                        {
+                            OvipProductId = item.ovip_product_id,
+                            Name = item.name ?? string.Empty,
+                            Sku = item.sku ?? string.Empty,
+                            ManufactureSku = item.manufacture_sku,
+                            Barcode = item.bar_code,
+                            Manufacturer = item.manufacturer,
+
+                            Deleted = item.deleted == 1,
+                            WebshopVisible = item.webshop_visible == 1,
+                            Orderable = item.orderable ?? 0,
+
+                            ShortDescription = item.short_description,
+                            LongDescription = item.long_description,
+                            SeoTitle = item.seo_title,
+                            SeoDescription = item.seo_description,
+
+                            NetWeight = item.net_weight,
+                            GrossWeight = item.gross_weight,
+                            Width = item.width,
+                            Height = item.height,
+                            Length = item.length,
+
+                            Unit = item.unit,
+                            AltUnit = item.alt_unit,
+                            AltUnitQuantity = item.alt_unit_quantity,
+                            ProductUnitQuantity = item.product_unit_quantity,
+
+                            NetPrice = item.net_price ?? 0,
+                            GrossPrice = item.gross_price ?? 0,
+                            Tax = item.tax ?? 0,
+
+                            NetSalePrice = item.net_sale_price,
+                            GrossSalePrice = item.gross_sale_price,
+                            SaleStart = item.sale_start,
+                            SaleEnd = item.sale_end,
+
+                            OvipCategoryId = item.ovip_category_id ?? 0
+                        });
+                    }
+                }
+
+                return json;
+            }
+
+            var allProducts = new List<OvipProductRemoteDto>();
+            var startFrom = 0;
+            const int pageSize = 10000;
 
             while (true)
             {
-                var json = await FetchFromPhpAsync(
+                var json = await CallPhpProxyAsync(
                     request: "getProducts",
                     extraData: null,
-                    limitFrom: limitFrom,
-                    limitTo: limitTo);
+                    limitFrom: startFrom,
+                    limitTo: pageSize);
 
                 var products = Deserialize<List<OvipProductRemoteDto>>(json);
 
                 if (products.Count == 0)
                     break;
+
+                allProducts.AddRange(products);
 
                 var existingProducts = await _productLogic.GetAllAsync();
 
@@ -288,16 +400,18 @@ namespace Logic.Logic.Sync
                     }
                 }
 
-                if (products.Count < limitTo)
+                if (products.Count < pageSize)
                     break;
 
-                limitFrom += limitTo;
+                startFrom += pageSize;
             }
+
+            return JsonSerializer.Serialize(allProducts);
         }
 
-        private async Task SyncCategoryConnectionsAsync()
+        public async Task<string> SyncCategoryConnectionsAsync()
         {
-            var json = await FetchFromPhpAsync("getCategoriesPlus");
+            var json = await CallPhpProxyAsync("getCategoriesPlus");
             var items = Deserialize<List<OvipCategoryConnectionRemoteDto>>(json);
 
             var existingConnections = await _categoryConnectionLogic.GetAllAsync();
@@ -326,11 +440,12 @@ namespace Logic.Logic.Sync
                     });
                 }
             }
+            return json;
         }
 
-        private async Task SyncPriceListPricesAsync()
+        public async Task<string> SyncPriceListPricesAsync()
         {
-            var json = await FetchFromPhpAsync("getPricelist");
+            var json = await CallPhpProxyAsync("getPricelist");
             var priceLists = Deserialize<List<OvipPriceListRemoteDto>>(json);
 
             var existingPrices = await _priceListPriceLogic.GetAllAsync();
@@ -376,11 +491,12 @@ namespace Logic.Logic.Sync
                     }
                 }
             }
+            return json;
         }
 
-        private async Task SyncQuantityDiscountsAsync()
+        public async Task<string> SyncQuantityDiscountsAsync()
         {
-            var json = await FetchFromPhpAsync("GetQtyDiscount");
+            var json = await CallPhpProxyAsync("GetQtyDiscount");
             var items = Deserialize<List<OvipQuantityDiscountRemoteDto>>(json);
 
             var existingDiscounts = await _quantityDiscountLogic.GetAllAsync();
@@ -417,11 +533,12 @@ namespace Logic.Logic.Sync
                     });
                 }
             }
+            return json;
         }
 
-        private async Task SyncManufacturesAsync()
+        public async Task<string> SyncManufacturesAsync()
         {
-            var json = await FetchFromPhpAsync("getManufacture");
+            var json = await CallPhpProxyAsync("getManufacture");
             var items = Deserialize<List<OvipManufactureRemoteDto>>(json);
 
             var existingManufactures = await _manufactureLogic.GetAllAsync();
@@ -476,6 +593,7 @@ namespace Logic.Logic.Sync
                     }
                 }
             }
+            return json;
         }
 
         private static T Deserialize<T>(string json)
@@ -486,7 +604,7 @@ namespace Logic.Logic.Sync
             }) ?? throw new Exception("Az OVIP válasz nem feldolgozható.");
         }
 
-        private static async Task<string> FetchFromPhpAsync(
+        public async Task<string> CallPhpProxyAsync(
             string request,
             string? extraData = null,
             int? limitFrom = null,
