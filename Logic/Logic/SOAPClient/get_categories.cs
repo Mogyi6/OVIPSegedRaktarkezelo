@@ -6,9 +6,17 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Security;
 
-public class OvipSoapExample
+namespace Logic.Logic.SOAPClient
 {
+    public class OvipSoapExample
+    {
     public static async Task Main()
+    {
+        var result = await GetCategoriesAsync();
+        Console.WriteLine(result);
+    }
+
+    public static async Task<string> GetCategoriesAsync()
     {
         // --------------------
         // Credentials
@@ -68,21 +76,11 @@ public class OvipSoapExample
             HttpResponseMessage response = await client.SendAsync(httpRequest);
             string responseBody = await response.Content.ReadAsStringAsync();
 
-            Console.WriteLine("HTTP status: " + (int)response.StatusCode + " " + response.StatusCode);
-
-            if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400)
-            {
-                Console.WriteLine("Redirect történt!");
-                Console.WriteLine("Location: " + response.Headers.Location);
-            }
-
-            Console.WriteLine("Response:");
-            Console.WriteLine(responseBody);
+            return $"HTTP status: {(int)response.StatusCode} {response.StatusCode}\n\nResponse:\n{responseBody}";
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Hiba történt:");
-            Console.WriteLine(ex.Message);
+            return $"Hiba történt:\n{ex.Message}";
         }
     }
 
@@ -125,14 +123,27 @@ public class OvipSoapExample
     SOAP-ENV:encodingStyle=""http://schemas.xmlsoap.org/soap/encoding/"">
     <SOAP-ENV:Body>
         <ns1:getRequest>
-            <param0 xsi:type=""SOAP-ENC:Struct"">
-                <request xsi:type=""xsd:string"">{xmlRequest}</request>
-                <user_id xsi:type=""xsd:string"">{xmlUserId}</user_id>
-                <signature xsi:type=""xsd:string"">{xmlSignature}</signature>
-                <webshop_id xsi:type=""xsd:string"">{xmlWebshopId}</webshop_id>
+            <param0 xsi:type=""SOAP-ENC:Array"" SOAP-ENC:arrayType=""xsd:anyType[4]"">
+                <item>
+                    <key xsi:type=""xsd:string"">request</key>
+                    <value xsi:type=""xsd:string"">{xmlRequest}</value>
+                </item>
+                <item>
+                    <key xsi:type=""xsd:string"">user_id</key>
+                    <value xsi:type=""xsd:string"">{xmlUserId}</value>
+                </item>
+                <item>
+                    <key xsi:type=""xsd:string"">signature</key>
+                    <value xsi:type=""xsd:string"">{xmlSignature}</value>
+                </item>
+                <item>
+                    <key xsi:type=""xsd:string"">webshop_id</key>
+                    <value xsi:type=""xsd:string"">{xmlWebshopId}</value>
+                </item>
             </param0>
         </ns1:getRequest>
     </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>";
+    }
     }
 }

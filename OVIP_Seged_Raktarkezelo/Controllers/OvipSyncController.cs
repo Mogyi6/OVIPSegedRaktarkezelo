@@ -102,6 +102,29 @@ namespace OVIP_Seged_Raktarkezelo.Controllers
             }
         }
 
+        [HttpGet("categories/get-categories-example")]
+        public async Task<IActionResult> GetCategoriesExample()
+        {
+            try
+            {
+                var result = await OvipSoapExample.GetCategoriesAsync();
+                return Ok(new
+                {
+                    message = "OvipSoapExample test végrehajtva",
+                    result = result
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = "OvipSoapExample hiba.",
+                    error = ex.Message,
+                    exception = ex.GetType().Name
+                });
+            }
+        }
+
         private static string Sha256Hex(string input)
         {
             byte[] bytes = Encoding.UTF8.GetBytes(input);
