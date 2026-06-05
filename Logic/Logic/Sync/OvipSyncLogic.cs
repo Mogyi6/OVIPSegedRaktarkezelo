@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace Logic.Logic.Sync
@@ -600,7 +601,8 @@ namespace Logic.Logic.Sync
         {
             return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true
+                PropertyNameCaseInsensitive = true,
+                NumberHandling = JsonNumberHandling.AllowReadingFromString
             }) ?? throw new Exception("Az OVIP válasz nem feldolgozható.");
         }
 
