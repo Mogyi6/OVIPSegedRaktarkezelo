@@ -9,7 +9,7 @@ using Logic.Logic.PricingLogic;
 using Logic.Logic.PricingLogic.Interfaces;
 using Logic.Logic.ProductsLogic;
 using Logic.Logic.ProductsLogic.Interfaces;
-using Logic.Logic.SOAPClient;
+using Logic.Logic.Sync;
 using Microsoft.EntityFrameworkCore;
 using Models.SOAPClient;
 using Repository.Context;
@@ -61,9 +61,8 @@ builder.Services.AddControllers()
 builder.Services.Configure<OvipOptions>(
     builder.Configuration.GetSection("Ovip"));
 
-builder.Services.AddHttpClient<IOvipSoapClient, OvipSoapClient>();
 
-builder.Services.AddScoped<IOvipSyncLogic, OvipSyncLogic>();
+builder.Services.AddScoped<Logic.Logic.Sync.IOvipSyncLogic, Logic.Logic.Sync.OvipSyncLogic>();
 
 
 // =========================
@@ -124,11 +123,7 @@ builder.Services.AddAutoMapper(cfg =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddHttpClient<IOvipSoapClient, OvipSoapClient>()
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-    {
-        AllowAutoRedirect = false
-    });
+// removed IOvipSoapClient registration - using PHP backend instead
 
 var app = builder.Build();
 

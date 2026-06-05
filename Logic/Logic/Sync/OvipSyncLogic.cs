@@ -1,4 +1,4 @@
-﻿using Logic.Logic.CategoriesLogic.Interfaces;
+using Logic.Logic.CategoriesLogic.Interfaces;
 using Logic.Logic.ManufactureLogic.Interfaces;
 using Logic.Logic.ParametersLogic.Interfaces;
 using Logic.Logic.PricingLogic.Interfaces;
@@ -16,12 +16,10 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace Logic.Logic.SOAPClient
+namespace Logic.Logic.Sync
 {
     public class OvipSyncLogic : IOvipSyncLogic
     {
-        private readonly IOvipSoapClient _client;
-
         private readonly IOvipCategoryLogic _categoryLogic;
         private readonly IOvipCategoryConnectionLogic _categoryConnectionLogic;
         private readonly IOvipProductLogic _productLogic;
@@ -33,7 +31,6 @@ namespace Logic.Logic.SOAPClient
         private readonly IOvipManufacturePartLogic _manufacturePartLogic;
 
         public OvipSyncLogic(
-            IOvipSoapClient client,
             IOvipCategoryLogic categoryLogic,
             IOvipCategoryConnectionLogic categoryConnectionLogic,
             IOvipProductLogic productLogic,
@@ -44,7 +41,6 @@ namespace Logic.Logic.SOAPClient
             IOvipManufactureLogic manufactureLogic,
             IOvipManufacturePartLogic manufacturePartLogic)
         {
-            _client = client;
             _categoryLogic = categoryLogic;
             _categoryConnectionLogic = categoryConnectionLogic;
             _productLogic = productLogic;
@@ -55,6 +51,10 @@ namespace Logic.Logic.SOAPClient
             _manufactureLogic = manufactureLogic;
             _manufacturePartLogic = manufacturePartLogic;
         }
+
+        // PHP backend URL (proxy to the OVIP SOAP API)
+        // Update if your PHP service runs on a different host/port
+        private const string PhpBackendUrl = "http://72.60.176.243:5000/";
 
         public async Task SyncAllAsync()
         {
@@ -73,7 +73,7 @@ namespace Logic.Logic.SOAPClient
 
         private async Task SyncCategoriesAsync()
         {
-            var json = await _client.GetRequestAsync("getCategories");
+            var json = await FetchFromPhpAsync("getCategories");
             var items = Deserialize<List<OvipCategoryRemoteDto>>(json);
 
             var existingCategories = await _categoryLogic.GetAllAsync();
@@ -116,7 +116,7 @@ namespace Logic.Logic.SOAPClient
 
         private async Task SyncParametersAsync()
         {
-            var json = await _client.GetRequestAsync("getParams");
+            var json = await FetchFromPhpAsync("getParams");
             var items = Deserialize<List<OvipParameterRemoteDto>>(json);
 
             var existingParameters = await _parameterLogic.GetAllAsync();
@@ -147,7 +147,7 @@ namespace Logic.Logic.SOAPClient
 
         private async Task SyncPriceListsAsync()
         {
-            var json = await _client.GetRequestAsync("getPricelist");
+            var json = await FetchFromPhpAsync("getPricelist");
             var items = Deserialize<List<OvipPriceListRemoteDto>>(json);
 
             var existingPriceLists = await _priceListLogic.GetAllAsync();
@@ -183,7 +183,7 @@ namespace Logic.Logic.SOAPClient
 
             while (true)
             {
-                var json = await _client.GetRequestAsync(
+                var json = await FetchFromPhpAsync(
                     request: "getProducts",
                     extraData: null,
                     limitFrom: limitFrom,
@@ -297,7 +297,7 @@ namespace Logic.Logic.SOAPClient
 
         private async Task SyncCategoryConnectionsAsync()
         {
-            var json = await _client.GetRequestAsync("getCategoriesPlus");
+            var json = await FetchFromPhpAsync("getCategoriesPlus");
             var items = Deserialize<List<OvipCategoryConnectionRemoteDto>>(json);
 
             var existingConnections = await _categoryConnectionLogic.GetAllAsync();
@@ -330,7 +330,7 @@ namespace Logic.Logic.SOAPClient
 
         private async Task SyncPriceListPricesAsync()
         {
-            var json = await _client.GetRequestAsync("getPricelist");
+            var json = await FetchFromPhpAsync("getPricelist");
             var priceLists = Deserialize<List<OvipPriceListRemoteDto>>(json);
 
             var existingPrices = await _priceListPriceLogic.GetAllAsync();
@@ -380,7 +380,7 @@ namespace Logic.Logic.SOAPClient
 
         private async Task SyncQuantityDiscountsAsync()
         {
-            var json = await _client.GetRequestAsync("GetQtyDiscount");
+            var json = await FetchFromPhpAsync("GetQtyDiscount");
             var items = Deserialize<List<OvipQuantityDiscountRemoteDto>>(json);
 
             var existingDiscounts = await _quantityDiscountLogic.GetAllAsync();
@@ -421,7 +421,7 @@ namespace Logic.Logic.SOAPClient
 
         private async Task SyncManufacturesAsync()
         {
-            var json = await _client.GetRequestAsync("getManufacture");
+            var json = await FetchFromPhpAsync("getManufacture");
             var items = Deserialize<List<OvipManufactureRemoteDto>>(json);
 
             var existingManufactures = await _manufactureLogic.GetAllAsync();
@@ -484,6 +484,53 @@ namespace Logic.Logic.SOAPClient
             {
                 PropertyNameCaseInsensitive = true
             }) ?? throw new Exception("Az OVIP válasz nem feldolgozható.");
+        }
+
+        private static async Task<string> FetchFromPhpAsync(
+            string request,
+            string? extraData = null,
+            int? limitFrom = null,
+            int? limitTo = null)
+        {
+            var url = PhpBackendUrl + "?request=" + Uri.EscapeDataString(request);
+
+            if (!string.IsNullOrEmpty(extraData))
+                url += "&extra_data=" + Uri.EscapeDataString(extraData);
+
+            if (limitFrom.HasValue)
+                url += "&limit_from=" + limitFrom.Value;
+
+            if (limitTo.HasValue)
+                url += "&limit_to=" + limitTo.Value;
+
+            using var client = new System.Net.Http.HttpClient();
+            var resp = await client.GetAsync(url);
+            resp.EnsureSuccessStatusCode();
+
+            var body = await resp.Content.ReadAsStringAsync();
+
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+
+                if (doc.RootElement.TryGetProperty("success", out var successEl) && successEl.ValueKind == JsonValueKind.False)
+                {
+                    throw new Exception("PHP backend returned success=false: " + body);
+                }
+
+                if (doc.RootElement.TryGetProperty("data", out var dataEl))
+                {
+                    return dataEl.GetRawText();
+                }
+
+                // Fallback: return entire body
+                return body;
+            }
+            catch (JsonException)
+            {
+                // Not JSON — return raw body
+                return body;
+            }
         }
     }
 }
