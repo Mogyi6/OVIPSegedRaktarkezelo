@@ -89,11 +89,7 @@ namespace OVIP_Seged_Raktarkezelo.Controllers
                 var response = await client.SendAsync(httpRequest);
                 var responseBody = await response.Content.ReadAsStringAsync();
 
-                return Ok(new
-                {
-                    status = (int)response.StatusCode,
-                    response = responseBody
-                });
+                return Content(responseBody, response.Content.Headers.ContentType?.MediaType ?? "text/xml");
             }
             catch (Exception ex)
             {
