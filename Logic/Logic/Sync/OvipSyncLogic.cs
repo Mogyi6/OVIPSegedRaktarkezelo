@@ -73,48 +73,82 @@ namespace Logic.Logic.Sync
         }
 
         public async Task<string> SyncCategoriesAsync()
+{
+    var json = await CallPhpProxyAsync("getCategories");
+    var items = Deserialize<List<OvipCategoryRemoteDto>>(json);
+
+    var existingCategories = await _categoryLogic.GetAllAsync();
+
+    // 1. kör: mentés ParentCategoryId nélkül
+    foreach (var item in items)
+    {
+        var existing = existingCategories
+            .FirstOrDefault(x => x.OvipCategoryId == item.ovip_category_id);
+
+        if (existing == null)
         {
-            var json = await CallPhpProxyAsync("getCategories");
-            var items = Deserialize<List<OvipCategoryRemoteDto>>(json);
-
-            var existingCategories = await _categoryLogic.GetAllAsync();
-
-            foreach (var item in items)
+            await _categoryLogic.CreateAsync(new OvipCategoryCreateDto
             {
-                var existing = existingCategories
-                    .FirstOrDefault(x => x.OvipCategoryId == item.ovip_category_id);
-
-                if (existing == null)
-                {
-                    await _categoryLogic.CreateAsync(new OvipCategoryCreateDto
-                    {
-                        OvipCategoryId = item.ovip_category_id,
-                        ParentCategoryId = item.parent_category_id,
-                        Name = item.name ?? string.Empty,
-                        Description = item.description,
-                        SeoTitle = item.seo_title,
-                        SeoDescription = item.seo_description,
-                        Image = item.image,
-                        Order = item.order
-                    });
-                }
-                else
-                {
-                    await _categoryLogic.UpdateAsync(new OvipCategoryUpdateDto
-                    {
-                        OvipCategoryId = item.ovip_category_id,
-                        ParentCategoryId = item.parent_category_id,
-                        Name = item.name ?? string.Empty,
-                        Description = item.description,
-                        SeoTitle = item.seo_title,
-                        SeoDescription = item.seo_description,
-                        Image = item.image,
-                        Order = item.order
-                    });
-                }
-            }
-            return json;
+                OvipCategoryId = item.ovip_category_id,
+                ParentCategoryId = null,
+                Name = item.name ?? string.Empty,
+                Description = item.description,
+                SeoTitle = item.seo_title,
+                SeoDescription = item.seo_description,
+                Image = item.image,
+                Order = item.order
+            });
         }
+        else
+        {
+            await _categoryLogic.UpdateAsync(new OvipCategoryUpdateDto
+            {
+                OvipCategoryId = item.ovip_category_id,
+                ParentCategoryId = null,
+                Name = item.name ?? string.Empty,
+                Description = item.description,
+                SeoTitle = item.seo_title,
+                SeoDescription = item.seo_description,
+                Image = item.image,
+                Order = item.order
+            });
+        }
+    }
+
+    // 2. kör: szülők beállítása az items alapján
+    foreach (var item in items)
+    {
+        var parentId = item.parent_category_id == 0
+            ? null
+            : item.parent_category_id;
+
+        var parentExists = parentId == null ||
+            items.Any(x => x.ovip_category_id == parentId);
+
+        if (!parentExists)
+        {
+            Console.WriteLine(
+                $"Hiányzó parent category: Category={item.ovip_category_id}, Parent={parentId}"
+            );
+
+            continue;
+        }
+
+        await _categoryLogic.UpdateAsync(new OvipCategoryUpdateDto
+        {
+            OvipCategoryId = item.ovip_category_id,
+            ParentCategoryId = parentId,
+            Name = item.name ?? string.Empty,
+            Description = item.description,
+            SeoTitle = item.seo_title,
+            SeoDescription = item.seo_description,
+            Image = item.image,
+            Order = item.order
+        });
+    }
+
+    return json;
+}
 
         public async Task<string> SyncParametersAsync()
         {
