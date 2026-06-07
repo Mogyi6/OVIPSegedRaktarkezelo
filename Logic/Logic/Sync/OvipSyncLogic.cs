@@ -272,6 +272,8 @@ namespace Logic.Logic.Sync
                             SaleEnd = item.sale_end,
 
                             OvipCategoryId = item.ovip_category_id ?? 0
+                            ,
+                            ProductVariantId = item.product_variant_id
                         });
                     }
                     else
@@ -315,6 +317,8 @@ namespace Logic.Logic.Sync
                             SaleEnd = item.sale_end,
 
                             OvipCategoryId = item.ovip_category_id ?? 0
+                            ,
+                            ProductVariantId = item.product_variant_id
                         });
                     }
                 }
@@ -388,6 +392,8 @@ namespace Logic.Logic.Sync
                             SaleEnd = item.sale_end,
 
                             OvipCategoryId = item.ovip_category_id ?? 0
+                            ,
+                            ProductVariantId = item.product_variant_id
                         });
                     }
                     else
@@ -431,6 +437,8 @@ namespace Logic.Logic.Sync
                             SaleEnd = item.sale_end,
 
                             OvipCategoryId = item.ovip_category_id ?? 0
+                            ,
+                            ProductVariantId = item.product_variant_id
                         });
                     }
                 }

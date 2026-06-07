@@ -82,10 +82,9 @@ namespace Repository.Context
                     .HasForeignKey(x => x.OvipCategoryId)
                     .OnDelete(DeleteBehavior.NoAction);
 
-                entity.HasOne(x => x.VariantProduct)
-                    .WithMany()
-                    .HasForeignKey(x => x.ProductVariantId)
-                    .OnDelete(DeleteBehavior.NoAction);
+                // Variant product relationship removed because remote variant ids are strings
+                // and the primary key of products is an int. Store the remote variant id
+                // as a string in `ProductVariantId` without a DB-level foreign key.
             });
 
             // =========================================================

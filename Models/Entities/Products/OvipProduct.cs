@@ -129,7 +129,7 @@ namespace Models.Entities.Products
         // VARIÁNSOK
         // =========================
 
-        public int? ProductVariantId { get; set; }
+        public string? ProductVariantId { get; set; }
 
         public OvipProduct? VariantProduct { get; set; }
 

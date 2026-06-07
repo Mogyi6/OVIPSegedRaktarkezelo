@@ -62,5 +62,9 @@ namespace Models.Dtos.Products
         // KATEGÓRIA
         // =========================
         public int OvipCategoryId { get; set; }
+        // =========================
+        // VARIÁNS AZ OVIP-TŐL
+        // =========================
+        public string? ProductVariantId { get; set; }
     }
 }

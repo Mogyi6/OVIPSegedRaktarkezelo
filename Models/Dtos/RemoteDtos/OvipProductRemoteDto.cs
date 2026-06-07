@@ -12,7 +12,7 @@ namespace Models.Dtos.RemoteDtos
         public string? name { get; set; }
         public string? sku { get; set; }
         public int? ovip_category_id { get; set; }
-        public int? product_variant_id { get; set; }
+        public string? product_variant_id { get; set; }
         public string? bar_code { get; set; }
         public string? unit { get; set; }
         public string? alt_unit { get; set; }
