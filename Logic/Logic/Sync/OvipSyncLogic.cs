@@ -239,7 +239,7 @@ namespace Logic.Logic.Sync
                         OvipCategoryId = categoryId,
                         ParentCategoryId = null,
                         Name = $"Placeholder category {categoryId}",
-                        Description = $"Automatically created because product {result.Processed + 1} referenced missing category {categoryId}.",
+                        Description = $"Automatically created because a product referenced missing category {categoryId}.",
                         Order = 0
                     });
 
@@ -252,18 +252,18 @@ namespace Logic.Logic.Sync
                 }
             }
 
-            async Task ProcessItemAsync(OvipProductRemoteDto item)
+            async Task ProcessItemAsync(OvipProductRemoteDto item, Dictionary<int, Models.Entities.Products.OvipProduct> existingProducts)
             {
                 result.Processed++;
                 var categoryId = item.ovip_category_id ?? 0;
-
-                await EnsureCategoryAsync(categoryId);
+                if (categoryId != 0)
+                    await EnsureCategoryAsync(categoryId);
 
                 try
                 {
-                    var existing = await _productLogic.GetByIdAsync(item.ovip_product_id);
+                    var exists = existingProducts.TryGetValue(item.ovip_product_id, out var existing);
 
-                    if (existing == null)
+                    if (!exists)
                     {
                         await _productLogic.CreateAsync(new OvipProductCreateDto
                         {
@@ -361,53 +361,18 @@ namespace Logic.Logic.Sync
                 }
             }
 
-            if (limitFrom.HasValue || limitTo.HasValue || !string.IsNullOrEmpty(extraData))
-            {
-                var json = await CallPhpProxyAsync(
-                    request: "getProducts",
-                    extraData: extraData,
-                    limitFrom: limitFrom,
-                    limitTo: limitTo);
+            var json = await CallPhpProxyAsync(
+                request: "getProducts",
+                extraData: extraData,
+                limitFrom: limitFrom,
+                limitTo: limitTo);
 
-                var products = Deserialize<List<OvipProductRemoteDto>>(json);
+            var products = Deserialize<List<OvipProductRemoteDto>>(json);
+            var existingProducts = (await _productLogic.GetAllAsync())
+                .ToDictionary(x => x.OvipProductId);
 
-                foreach (var item in products)
-                    await ProcessItemAsync(item);
-
-                return JsonSerializer.Serialize(result, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    WriteIndented = true
-                });
-            }
-
-            var allProducts = new List<OvipProductRemoteDto>();
-            var startFrom = 0;
-            const int pageSize = 10000;
-
-            while (true)
-            {
-                var json = await CallPhpProxyAsync(
-                    request: "getProducts",
-                    extraData: null,
-                    limitFrom: startFrom,
-                    limitTo: pageSize);
-
-                var products = Deserialize<List<OvipProductRemoteDto>>(json);
-
-                if (products.Count == 0)
-                    break;
-
-                allProducts.AddRange(products);
-
-                foreach (var item in products)
-                    await ProcessItemAsync(item);
-
-                if (products.Count < pageSize)
-                    break;
-
-                startFrom += pageSize;
-            }
+            foreach (var item in products)
+                await ProcessItemAsync(item, existingProducts);
 
             return JsonSerializer.Serialize(result, new JsonSerializerOptions
             {
