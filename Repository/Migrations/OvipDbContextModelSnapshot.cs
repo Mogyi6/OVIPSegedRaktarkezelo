@@ -335,8 +335,9 @@ namespace Repository.Migrations
                     b.Property<decimal?>("ProductUnitQuantity")
                         .HasColumnType("decimal(65,30)");
 
-                    b.Property<int?>("ProductVariantId")
-                        .HasColumnType("int");
+                    b.Property<string>("ProductVariantId")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
 
                     b.Property<DateTime?>("SaleEnd")
                         .HasColumnType("datetime(6)");
@@ -573,14 +574,7 @@ namespace Repository.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("Models.Entities.Products.OvipProduct", "VariantProduct")
-                        .WithMany()
-                        .HasForeignKey("ProductVariantId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.Navigation("MainCategory");
-
-                    b.Navigation("VariantProduct");
                 });
 
             modelBuilder.Entity("Models.Entities.Products.OvipProductImage", b =>

@@ -82,6 +82,10 @@ namespace Repository.Context
                     .HasForeignKey(x => x.OvipCategoryId)
                     .OnDelete(DeleteBehavior.NoAction);
 
+                entity.Property(x => x.ProductVariantId)
+                    .HasMaxLength(255)
+                    .HasColumnType("varchar(255)");
+
                 entity.Ignore(x => x.VariantProduct);
 
                 // Variant product relationship removed because remote variant ids are strings
