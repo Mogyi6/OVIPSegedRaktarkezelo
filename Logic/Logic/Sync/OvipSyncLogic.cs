@@ -216,21 +216,52 @@ namespace Logic.Logic.Sync
 
         public async Task<string> SyncProductsAsync(string? extraData = null, int? limitFrom = null, int? limitTo = null)
         {
-            if (limitFrom.HasValue || limitTo.HasValue || !string.IsNullOrEmpty(extraData))
+            var result = new ProductSyncResult();
+            var existingCategoryIds = new HashSet<int>(
+                (await _categoryLogic.GetAllAsync()).Select(x => x.OvipCategoryId));
+
+            async Task EnsureCategoryAsync(int categoryId)
             {
-                var json = await CallPhpProxyAsync(
-                    request: "getProducts",
-                    extraData: extraData,
-                    limitFrom: limitFrom,
-                    limitTo: limitTo);
+                if (existingCategoryIds.Contains(categoryId))
+                    return;
 
-                var products = Deserialize<List<OvipProductRemoteDto>>(json);
-                var existingProducts = await _productLogic.GetAllAsync();
-
-                foreach (var item in products)
+                var existing = await _categoryLogic.GetByIdAsync(categoryId);
+                if (existing != null)
                 {
-                    var existing = existingProducts
-                        .FirstOrDefault(x => x.OvipProductId == item.ovip_product_id);
+                    existingCategoryIds.Add(categoryId);
+                    return;
+                }
+
+                try
+                {
+                    await _categoryLogic.CreateAsync(new OvipCategoryCreateDto
+                    {
+                        OvipCategoryId = categoryId,
+                        ParentCategoryId = null,
+                        Name = $"Placeholder category {categoryId}",
+                        Description = $"Automatically created because product {result.Processed + 1} referenced missing category {categoryId}.",
+                        Order = 0
+                    });
+
+                    existingCategoryIds.Add(categoryId);
+                    result.Warnings.Add($"Placeholder category created for missing category id {categoryId}.");
+                }
+                catch (Exception ex)
+                {
+                    result.Errors.Add($"Failed to create placeholder category {categoryId}: {ex.Message}");
+                }
+            }
+
+            async Task ProcessItemAsync(OvipProductRemoteDto item)
+            {
+                result.Processed++;
+                var categoryId = item.ovip_category_id ?? 0;
+
+                await EnsureCategoryAsync(categoryId);
+
+                try
+                {
+                    var existing = await _productLogic.GetByIdAsync(item.ovip_product_id);
 
                     if (existing == null)
                     {
@@ -271,9 +302,11 @@ namespace Logic.Logic.Sync
                             SaleStart = ParseNullableDate(item.sale_start),
                             SaleEnd = ParseNullableDate(item.sale_end),
 
-                            OvipCategoryId = item.ovip_category_id ?? 0,
+                            OvipCategoryId = categoryId,
                             ProductVariantId = item.product_variant_id
                         });
+
+                        result.Created++;
                     }
                     else
                     {
@@ -315,13 +348,37 @@ namespace Logic.Logic.Sync
                             SaleStart = ParseNullableDate(item.sale_start),
                             SaleEnd = ParseNullableDate(item.sale_end),
 
-                            OvipCategoryId = item.ovip_category_id ?? 0,
+                            OvipCategoryId = categoryId,
                             ProductVariantId = item.product_variant_id
                         });
+
+                        result.Updated++;
                     }
                 }
+                catch (Exception ex)
+                {
+                    result.Errors.Add($"Product {item.ovip_product_id}: {ex.Message}");
+                }
+            }
 
-                return json;
+            if (limitFrom.HasValue || limitTo.HasValue || !string.IsNullOrEmpty(extraData))
+            {
+                var json = await CallPhpProxyAsync(
+                    request: "getProducts",
+                    extraData: extraData,
+                    limitFrom: limitFrom,
+                    limitTo: limitTo);
+
+                var products = Deserialize<List<OvipProductRemoteDto>>(json);
+
+                foreach (var item in products)
+                    await ProcessItemAsync(item);
+
+                return JsonSerializer.Serialize(result, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    WriteIndented = true
+                });
             }
 
             var allProducts = new List<OvipProductRemoteDto>();
@@ -343,101 +400,8 @@ namespace Logic.Logic.Sync
 
                 allProducts.AddRange(products);
 
-                var existingProducts = await _productLogic.GetAllAsync();
-
                 foreach (var item in products)
-                {
-                    var existing = existingProducts
-                        .FirstOrDefault(x => x.OvipProductId == item.ovip_product_id);
-
-                    if (existing == null)
-                    {
-                        await _productLogic.CreateAsync(new OvipProductCreateDto
-                        {
-                            OvipProductId = item.ovip_product_id,
-                            Name = item.name ?? string.Empty,
-                            Sku = item.sku ?? string.Empty,
-                            ManufactureSku = item.manufacture_sku,
-                            Barcode = item.bar_code,
-                            Manufacturer = item.manufacturer,
-
-                            WebshopVisible = item.webshop_visible ?? false,
-                            Orderable = item.orderable ?? 0,
-
-                            ShortDescription = item.short_description,
-                            LongDescription = item.long_description,
-                            SeoTitle = item.seo_title,
-                            SeoDescription = item.seo_description,
-
-                            NetWeight = item.net_weight,
-                            GrossWeight = item.gross_weight,
-                            Width = item.width,
-                            Height = item.height,
-                            Length = item.length,
-
-                            Unit = item.unit,
-                            AltUnit = item.alt_unit,
-                            AltUnitQuantity = item.alt_unit_quantity,
-                            ProductUnitQuantity = item.product_unit_quantity,
-
-                            NetPrice = item.net_price ?? 0,
-                            GrossPrice = item.gross_price ?? 0,
-                            Tax = item.tax ?? 0,
-
-                            NetSalePrice = item.net_sale_price,
-                            GrossSalePrice = item.gross_sale_price,
-                            SaleStart = ParseNullableDate(item.sale_start),
-                            SaleEnd = ParseNullableDate(item.sale_end),
-
-                            OvipCategoryId = item.ovip_category_id ?? 0,
-                            ProductVariantId = item.product_variant_id
-                        });
-                    }
-                    else
-                    {
-                        await _productLogic.UpdateAsync(new OvipProductUpdateDto
-                        {
-                            OvipProductId = item.ovip_product_id,
-                            Name = item.name ?? string.Empty,
-                            Sku = item.sku ?? string.Empty,
-                            ManufactureSku = item.manufacture_sku,
-                            Barcode = item.bar_code,
-                            Manufacturer = item.manufacturer,
-
-                            Deleted = item.deleted ?? false,
-                            WebshopVisible = item.webshop_visible ?? false,
-                            Orderable = item.orderable ?? 0,
-
-                            ShortDescription = item.short_description,
-                            LongDescription = item.long_description,
-                            SeoTitle = item.seo_title,
-                            SeoDescription = item.seo_description,
-
-                            NetWeight = item.net_weight,
-                            GrossWeight = item.gross_weight,
-                            Width = item.width,
-                            Height = item.height,
-                            Length = item.length,
-
-                            Unit = item.unit,
-                            AltUnit = item.alt_unit,
-                            AltUnitQuantity = item.alt_unit_quantity,
-                            ProductUnitQuantity = item.product_unit_quantity,
-
-                            NetPrice = item.net_price ?? 0,
-                            GrossPrice = item.gross_price ?? 0,
-                            Tax = item.tax ?? 0,
-
-                            NetSalePrice = item.net_sale_price,
-                            GrossSalePrice = item.gross_sale_price,
-                            SaleStart = ParseNullableDate(item.sale_start),
-                            SaleEnd = ParseNullableDate(item.sale_end),
-
-                            OvipCategoryId = item.ovip_category_id ?? 0,
-                            ProductVariantId = item.product_variant_id
-                        });
-                    }
-                }
+                    await ProcessItemAsync(item);
 
                 if (products.Count < pageSize)
                     break;
@@ -445,7 +409,11 @@ namespace Logic.Logic.Sync
                 startFrom += pageSize;
             }
 
-            return JsonSerializer.Serialize(allProducts);
+            return JsonSerializer.Serialize(result, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                WriteIndented = true
+            });
         }
 
         public async Task<string> SyncCategoryConnectionsAsync()
@@ -652,6 +620,15 @@ namespace Logic.Logic.Sync
             return DateTime.TryParse(dateString, out var parsed)
                 ? parsed
                 : null;
+        }
+
+        private sealed class ProductSyncResult
+        {
+            public int Processed { get; set; }
+            public int Created { get; set; }
+            public int Updated { get; set; }
+            public List<string> Errors { get; set; } = new();
+            public List<string> Warnings { get; set; } = new();
         }
 
         public async Task<string> CallPhpProxyAsync(
