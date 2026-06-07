@@ -13,8 +13,8 @@ namespace Models.Dtos.RemoteDtos
         public decimal gross_price { get; set; }
         public decimal? net_sale_price { get; set; }
         public decimal? gross_sale_price { get; set; }
-        public DateTime? sale_start { get; set; }
-        public DateTime? sale_end { get; set; }
+        public string? sale_start { get; set; }
+        public string? sale_end { get; set; }
         public decimal tax { get; set; }
     }
 }

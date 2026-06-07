@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace Models.Dtos.RemoteDtos
@@ -35,13 +37,61 @@ namespace Models.Dtos.RemoteDtos
         public decimal? gross_price { get; set; }
         public decimal? net_sale_price { get; set; }
         public decimal? gross_sale_price { get; set; }
-        public DateTime? sale_start { get; set; }
-        public DateTime? sale_end { get; set; }
+        public string? sale_start { get; set; }
+        public string? sale_end { get; set; }
         public decimal? acquisition_cost_huf { get; set; }
         public decimal? acquisition_cost_foreign { get; set; }
         public string? acquisition_cost_currency { get; set; }
         public decimal? acquisition_cost_exchange { get; set; }
-        public int? webshop_visible { get; set; }
-        public int? deleted { get; set; }
+
+        [JsonConverter(typeof(StringBooleanJsonConverter))]
+        public bool? webshop_visible { get; set; }
+
+        [JsonConverter(typeof(StringBooleanJsonConverter))]
+        public bool? deleted { get; set; }
+    }
+
+    public class StringBooleanJsonConverter : JsonConverter<bool?>
+    {
+        public override bool? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.True)
+                return true;
+
+            if (reader.TokenType == JsonTokenType.False)
+                return false;
+
+            if (reader.TokenType == JsonTokenType.Number)
+            {
+                return reader.GetInt32() != 0;
+            }
+
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                var stringValue = reader.GetString();
+                if (string.IsNullOrWhiteSpace(stringValue))
+                    return null;
+
+                if (int.TryParse(stringValue, out var intValue))
+                    return intValue != 0;
+
+                if (bool.TryParse(stringValue, out var boolValue))
+                    return boolValue;
+            }
+
+            return null;
+        }
+
+        public override void Write(Utf8JsonWriter writer, bool? value, JsonSerializerOptions options)
+        {
+            if (value.HasValue)
+            {
+                writer.WriteStringValue(value.Value ? "1" : "0");
+            }
+            else
+            {
+                writer.WriteNullValue();
+            }
+        }
     }
 }

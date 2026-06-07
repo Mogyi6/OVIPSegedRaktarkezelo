@@ -243,7 +243,7 @@ namespace Logic.Logic.Sync
                             Barcode = item.bar_code,
                             Manufacturer = item.manufacturer,
 
-                            WebshopVisible = item.webshop_visible == 1,
+                            WebshopVisible = item.webshop_visible ?? false,
                             Orderable = item.orderable ?? 0,
 
                             ShortDescription = item.short_description,
@@ -268,11 +268,10 @@ namespace Logic.Logic.Sync
 
                             NetSalePrice = item.net_sale_price,
                             GrossSalePrice = item.gross_sale_price,
-                            SaleStart = item.sale_start,
-                            SaleEnd = item.sale_end,
+                            SaleStart = ParseNullableDate(item.sale_start),
+                            SaleEnd = ParseNullableDate(item.sale_end),
 
-                            OvipCategoryId = item.ovip_category_id ?? 0
-                            ,
+                            OvipCategoryId = item.ovip_category_id ?? 0,
                             ProductVariantId = item.product_variant_id
                         });
                     }
@@ -287,8 +286,8 @@ namespace Logic.Logic.Sync
                             Barcode = item.bar_code,
                             Manufacturer = item.manufacturer,
 
-                            Deleted = item.deleted == 1,
-                            WebshopVisible = item.webshop_visible == 1,
+                            Deleted = item.deleted ?? false,
+                            WebshopVisible = item.webshop_visible ?? false,
                             Orderable = item.orderable ?? 0,
 
                             ShortDescription = item.short_description,
@@ -313,11 +312,10 @@ namespace Logic.Logic.Sync
 
                             NetSalePrice = item.net_sale_price,
                             GrossSalePrice = item.gross_sale_price,
-                            SaleStart = item.sale_start,
-                            SaleEnd = item.sale_end,
+                            SaleStart = ParseNullableDate(item.sale_start),
+                            SaleEnd = ParseNullableDate(item.sale_end),
 
-                            OvipCategoryId = item.ovip_category_id ?? 0
-                            ,
+                            OvipCategoryId = item.ovip_category_id ?? 0,
                             ProductVariantId = item.product_variant_id
                         });
                     }
@@ -363,7 +361,7 @@ namespace Logic.Logic.Sync
                             Barcode = item.bar_code,
                             Manufacturer = item.manufacturer,
 
-                            WebshopVisible = item.webshop_visible == 1,
+                            WebshopVisible = item.webshop_visible ?? false,
                             Orderable = item.orderable ?? 0,
 
                             ShortDescription = item.short_description,
@@ -388,11 +386,10 @@ namespace Logic.Logic.Sync
 
                             NetSalePrice = item.net_sale_price,
                             GrossSalePrice = item.gross_sale_price,
-                            SaleStart = item.sale_start,
-                            SaleEnd = item.sale_end,
+                            SaleStart = ParseNullableDate(item.sale_start),
+                            SaleEnd = ParseNullableDate(item.sale_end),
 
-                            OvipCategoryId = item.ovip_category_id ?? 0
-                            ,
+                            OvipCategoryId = item.ovip_category_id ?? 0,
                             ProductVariantId = item.product_variant_id
                         });
                     }
@@ -407,8 +404,8 @@ namespace Logic.Logic.Sync
                             Barcode = item.bar_code,
                             Manufacturer = item.manufacturer,
 
-                            Deleted = item.deleted == 1,
-                            WebshopVisible = item.webshop_visible == 1,
+                            Deleted = item.deleted ?? false,
+                            WebshopVisible = item.webshop_visible ?? false,
                             Orderable = item.orderable ?? 0,
 
                             ShortDescription = item.short_description,
@@ -433,11 +430,10 @@ namespace Logic.Logic.Sync
 
                             NetSalePrice = item.net_sale_price,
                             GrossSalePrice = item.gross_sale_price,
-                            SaleStart = item.sale_start,
-                            SaleEnd = item.sale_end,
+                            SaleStart = ParseNullableDate(item.sale_start),
+                            SaleEnd = ParseNullableDate(item.sale_end),
 
-                            OvipCategoryId = item.ovip_category_id ?? 0
-                            ,
+                            OvipCategoryId = item.ovip_category_id ?? 0,
                             ProductVariantId = item.product_variant_id
                         });
                     }
@@ -512,8 +508,8 @@ namespace Logic.Logic.Sync
                             NetSalePrice = price.net_sale_price,
                             GrossSalePrice = price.gross_sale_price,
                             Tax = price.tax,
-                            SaleStart = price.sale_start,
-                            SaleEnd = price.sale_end
+                            SaleStart = ParseNullableDate(price.sale_start),
+                            SaleEnd = ParseNullableDate(price.sale_end)
                         });
                     }
                     else
@@ -528,8 +524,8 @@ namespace Logic.Logic.Sync
                             NetSalePrice = price.net_sale_price,
                             GrossSalePrice = price.gross_sale_price,
                             Tax = price.tax,
-                            SaleStart = price.sale_start,
-                            SaleEnd = price.sale_end
+                            SaleStart = ParseNullableDate(price.sale_start),
+                            SaleEnd = ParseNullableDate(price.sale_end)
                         });
                     }
                 }
@@ -646,6 +642,16 @@ namespace Logic.Logic.Sync
                 PropertyNameCaseInsensitive = true,
                 NumberHandling = JsonNumberHandling.AllowReadingFromString
             }) ?? throw new Exception("Az OVIP válasz nem feldolgozható.");
+        }
+
+        private static DateTime? ParseNullableDate(string? dateString)
+        {
+            if (string.IsNullOrWhiteSpace(dateString))
+                return null;
+
+            return DateTime.TryParse(dateString, out var parsed)
+                ? parsed
+                : null;
         }
 
         public async Task<string> CallPhpProxyAsync(
