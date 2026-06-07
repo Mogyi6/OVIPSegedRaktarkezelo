@@ -215,171 +215,275 @@ namespace Logic.Logic.Sync
         }
 
         public async Task<string> SyncProductsAsync(string? extraData = null, int? limitFrom = null, int? limitTo = null)
+{
+    var result = new ProductSyncResult();
+
+    var logs = new List<string>();
+
+    void Log(string message)
+    {
+        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}";
+        logs.Add(line);
+        Console.WriteLine(line);
+    }
+
+    Log("===== PRODUCT SYNC START =====");
+    Log($"Input extraData: '{extraData ?? "NULL"}'");
+    Log($"Input limitFrom: {(limitFrom.HasValue ? limitFrom.Value.ToString() : "NULL")}");
+    Log($"Input limitTo: {(limitTo.HasValue ? limitTo.Value.ToString() : "NULL")}");
+
+    var existingCategoryIds = new HashSet<int>(
+        (await _categoryLogic.GetAllAsync()).Select(x => x.OvipCategoryId));
+
+    Log($"Existing categories count: {existingCategoryIds.Count}");
+
+    async Task EnsureCategoryAsync(int categoryId)
+    {
+        Log($"Checking category: {categoryId}");
+
+        if (existingCategoryIds.Contains(categoryId))
         {
-            var result = new ProductSyncResult();
-            var existingCategoryIds = new HashSet<int>(
-                (await _categoryLogic.GetAllAsync()).Select(x => x.OvipCategoryId));
-
-            async Task EnsureCategoryAsync(int categoryId)
-            {
-                if (existingCategoryIds.Contains(categoryId))
-                    return;
-
-                var existing = await _categoryLogic.GetByIdAsync(categoryId);
-                if (existing != null)
-                {
-                    existingCategoryIds.Add(categoryId);
-                    return;
-                }
-
-                try
-                {
-                    await _categoryLogic.CreateAsync(new OvipCategoryCreateDto
-                    {
-                        OvipCategoryId = categoryId,
-                        ParentCategoryId = null,
-                        Name = $"Placeholder category {categoryId}",
-                        Description = $"Automatically created because a product referenced missing category {categoryId}.",
-                        Order = 0
-                    });
-
-                    existingCategoryIds.Add(categoryId);
-                    result.Warnings.Add($"Placeholder category created for missing category id {categoryId}.");
-                }
-                catch (Exception ex)
-                {
-                    result.Errors.Add($"Failed to create placeholder category {categoryId}: {ex.Message}");
-                }
-            }
-
-            async Task ProcessItemAsync(OvipProductRemoteDto item, Dictionary<int, Models.Entities.Products.OvipProduct> existingProducts)
-            {
-                result.Processed++;
-                var categoryId = item.ovip_category_id ?? 0;
-                if (categoryId != 0)
-                    await EnsureCategoryAsync(categoryId);
-
-                try
-                {
-                    var exists = existingProducts.TryGetValue(item.ovip_product_id, out var existing);
-
-                    if (!exists)
-                    {
-                        await _productLogic.CreateAsync(new OvipProductCreateDto
-                        {
-                            OvipProductId = item.ovip_product_id,
-                            Name = item.name ?? string.Empty,
-                            Sku = item.sku ?? string.Empty,
-                            ManufactureSku = item.manufacture_sku,
-                            Barcode = item.bar_code,
-                            Manufacturer = item.manufacturer,
-
-                            WebshopVisible = item.webshop_visible ?? false,
-                            Orderable = item.orderable ?? 0,
-
-                            ShortDescription = item.short_description,
-                            LongDescription = item.long_description,
-                            SeoTitle = item.seo_title,
-                            SeoDescription = item.seo_description,
-
-                            NetWeight = item.net_weight,
-                            GrossWeight = item.gross_weight,
-                            Width = item.width,
-                            Height = item.height,
-                            Length = item.length,
-
-                            Unit = item.unit,
-                            AltUnit = item.alt_unit,
-                            AltUnitQuantity = item.alt_unit_quantity,
-                            ProductUnitQuantity = item.product_unit_quantity,
-
-                            NetPrice = item.net_price ?? 0,
-                            GrossPrice = item.gross_price ?? 0,
-                            Tax = item.tax ?? 0,
-
-                            NetSalePrice = item.net_sale_price,
-                            GrossSalePrice = item.gross_sale_price,
-                            SaleStart = ParseNullableDate(item.sale_start),
-                            SaleEnd = ParseNullableDate(item.sale_end),
-
-                            OvipCategoryId = categoryId,
-                            ProductVariantId = item.product_variant_id
-                        });
-
-                        result.Created++;
-                    }
-                    else
-                    {
-                        await _productLogic.UpdateAsync(new OvipProductUpdateDto
-                        {
-                            OvipProductId = item.ovip_product_id,
-                            Name = item.name ?? string.Empty,
-                            Sku = item.sku ?? string.Empty,
-                            ManufactureSku = item.manufacture_sku,
-                            Barcode = item.bar_code,
-                            Manufacturer = item.manufacturer,
-
-                            Deleted = item.deleted ?? false,
-                            WebshopVisible = item.webshop_visible ?? false,
-                            Orderable = item.orderable ?? 0,
-
-                            ShortDescription = item.short_description,
-                            LongDescription = item.long_description,
-                            SeoTitle = item.seo_title,
-                            SeoDescription = item.seo_description,
-
-                            NetWeight = item.net_weight,
-                            GrossWeight = item.gross_weight,
-                            Width = item.width,
-                            Height = item.height,
-                            Length = item.length,
-
-                            Unit = item.unit,
-                            AltUnit = item.alt_unit,
-                            AltUnitQuantity = item.alt_unit_quantity,
-                            ProductUnitQuantity = item.product_unit_quantity,
-
-                            NetPrice = item.net_price ?? 0,
-                            GrossPrice = item.gross_price ?? 0,
-                            Tax = item.tax ?? 0,
-
-                            NetSalePrice = item.net_sale_price,
-                            GrossSalePrice = item.gross_sale_price,
-                            SaleStart = ParseNullableDate(item.sale_start),
-                            SaleEnd = ParseNullableDate(item.sale_end),
-
-                            OvipCategoryId = categoryId,
-                            ProductVariantId = item.product_variant_id
-                        });
-
-                        result.Updated++;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    result.Errors.Add($"Product {item.ovip_product_id}: {ex.Message}");
-                }
-            }
-
-            var json = await CallPhpProxyAsync(
-                request: "getProducts",
-                extraData: extraData,
-                limitFrom: limitFrom,
-                limitTo: limitTo);
-
-            var products = Deserialize<List<OvipProductRemoteDto>>(json);
-            var existingProducts = (await _productLogic.GetAllAsync())
-                .ToDictionary(x => x.OvipProductId);
-
-            foreach (var item in products)
-                await ProcessItemAsync(item, existingProducts);
-
-            return JsonSerializer.Serialize(result, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                WriteIndented = true
-            });
+            Log($"Category exists in cache: {categoryId}");
+            return;
         }
+
+        var existing = await _categoryLogic.GetByIdAsync(categoryId);
+
+        if (existing != null)
+        {
+            existingCategoryIds.Add(categoryId);
+            Log($"Category exists in database: {categoryId}");
+            return;
+        }
+
+        try
+        {
+            Log($"Creating placeholder category: {categoryId}");
+
+            await _categoryLogic.CreateAsync(new OvipCategoryCreateDto
+            {
+                OvipCategoryId = categoryId,
+                ParentCategoryId = null,
+                Name = $"Placeholder category {categoryId}",
+                Description = $"Automatically created because a product referenced missing category {categoryId}.",
+                Order = 0
+            });
+
+            existingCategoryIds.Add(categoryId);
+
+            var warning = $"Placeholder category created for missing category id {categoryId}.";
+            result.Warnings.Add(warning);
+            Log($"WARNING: {warning}");
+        }
+        catch (Exception ex)
+        {
+            var error = $"Failed to create placeholder category {categoryId}: {ex.GetBaseException().Message}";
+            result.Errors.Add(error);
+            Log($"ERROR: {error}");
+        }
+    }
+
+    async Task ProcessItemAsync(
+        OvipProductRemoteDto item,
+        Dictionary<int, Models.Entities.Products.OvipProduct> existingProducts)
+    {
+        result.Processed++;
+
+        Log("");
+        Log("--------------------------------------------------");
+        Log($"Processing product #{result.Processed}");
+        Log($"OvipProductId: {item.ovip_product_id}");
+        Log($"Name: {item.name ?? "NULL"}");
+        Log($"Sku: {item.sku ?? "NULL"}");
+        Log($"CategoryId raw: {(item.ovip_category_id.HasValue ? item.ovip_category_id.Value.ToString() : "NULL")}");
+        Log($"VariantId raw: {item.product_variant_id ?? "NULL"}");
+        Log($"Manufacturer: {item.manufacturer ?? "NULL"}");
+        Log($"ManufactureSku: {item.manufacture_sku ?? "NULL"}");
+        Log($"Barcode: {item.bar_code ?? "NULL"}");
+        Log($"WebshopVisible: {(item.webshop_visible.HasValue ? item.webshop_visible.Value.ToString() : "NULL")}");
+        Log($"Deleted: {(item.deleted.HasValue ? item.deleted.Value.ToString() : "NULL")}");
+        Log($"Orderable: {(item.orderable.HasValue ? item.orderable.Value.ToString() : "NULL")}");
+        Log($"NetPrice: {(item.net_price.HasValue ? item.net_price.Value.ToString() : "NULL")}");
+        Log($"GrossPrice: {(item.gross_price.HasValue ? item.gross_price.Value.ToString() : "NULL")}");
+        Log($"Tax: {(item.tax.HasValue ? item.tax.Value.ToString() : "NULL")}");
+        Log($"NetSalePrice: {(item.net_sale_price.HasValue ? item.net_sale_price.Value.ToString() : "NULL")}");
+        Log($"GrossSalePrice: {(item.gross_sale_price.HasValue ? item.gross_sale_price.Value.ToString() : "NULL")}");
+        Log($"SaleStart raw: {item.sale_start ?? "NULL"}");
+        Log($"SaleEnd raw: {item.sale_end ?? "NULL"}");
+
+        var categoryId = item.ovip_category_id ?? 0;
+
+        if (categoryId == 0)
+        {
+            var error = $"Product {item.ovip_product_id}: missing or zero category id.";
+            result.Errors.Add(error);
+            Log($"ERROR: {error}");
+            return;
+        }
+
+        await EnsureCategoryAsync(categoryId);
+
+        var saleStart = ParseNullableDate(item.sale_start);
+        var saleEnd = ParseNullableDate(item.sale_end);
+
+        Log($"Parsed SaleStart: {(saleStart.HasValue ? saleStart.Value.ToString("yyyy-MM-dd HH:mm:ss") : "NULL")}");
+        Log($"Parsed SaleEnd: {(saleEnd.HasValue ? saleEnd.Value.ToString("yyyy-MM-dd HH:mm:ss") : "NULL")}");
+
+        try
+        {
+            var exists = existingProducts.TryGetValue(item.ovip_product_id, out var existing);
+
+            Log($"Product exists: {exists}");
+
+            if (!exists)
+            {
+                Log("Action: CREATE");
+
+                await _productLogic.CreateAsync(new OvipProductCreateDto
+                {
+                    OvipProductId = item.ovip_product_id,
+                    Name = item.name ?? string.Empty,
+                    Sku = item.sku ?? string.Empty,
+                    ManufactureSku = item.manufacture_sku,
+                    Barcode = item.bar_code,
+                    Manufacturer = item.manufacturer,
+
+                    // Deleted = item.deleted ?? false,
+                    WebshopVisible = item.webshop_visible ?? false,
+                    Orderable = item.orderable ?? 0,
+
+                    ShortDescription = item.short_description,
+                    LongDescription = item.long_description,
+                    SeoTitle = item.seo_title,
+                    SeoDescription = item.seo_description,
+
+                    NetWeight = item.net_weight,
+                    GrossWeight = item.gross_weight,
+                    Width = item.width,
+                    Height = item.height,
+                    Length = item.length,
+
+                    Unit = item.unit,
+                    AltUnit = item.alt_unit,
+                    AltUnitQuantity = item.alt_unit_quantity,
+                    ProductUnitQuantity = item.product_unit_quantity,
+
+                    NetPrice = item.net_price ?? 0,
+                    GrossPrice = item.gross_price ?? 0,
+                    Tax = item.tax ?? 0,
+
+                    NetSalePrice = item.net_sale_price,
+                    GrossSalePrice = item.gross_sale_price,
+                    SaleStart = saleStart,
+                    SaleEnd = saleEnd,
+
+                    OvipCategoryId = categoryId,
+                    ProductVariantId = item.product_variant_id
+                });
+
+                result.Created++;
+                Log($"SUCCESS CREATE ProductId={item.ovip_product_id}");
+            }
+            else
+            {
+                Log("Action: UPDATE");
+
+                await _productLogic.UpdateAsync(new OvipProductUpdateDto
+                {
+                    OvipProductId = item.ovip_product_id,
+                    Name = item.name ?? string.Empty,
+                    Sku = item.sku ?? string.Empty,
+                    ManufactureSku = item.manufacture_sku,
+                    Barcode = item.bar_code,
+                    Manufacturer = item.manufacturer,
+
+                    Deleted = item.deleted ?? false,
+                    WebshopVisible = item.webshop_visible ?? false,
+                    Orderable = item.orderable ?? 0,
+
+                    ShortDescription = item.short_description,
+                    LongDescription = item.long_description,
+                    SeoTitle = item.seo_title,
+                    SeoDescription = item.seo_description,
+
+                    NetWeight = item.net_weight,
+                    GrossWeight = item.gross_weight,
+                    Width = item.width,
+                    Height = item.height,
+                    Length = item.length,
+
+                    Unit = item.unit,
+                    AltUnit = item.alt_unit,
+                    AltUnitQuantity = item.alt_unit_quantity,
+                    ProductUnitQuantity = item.product_unit_quantity,
+
+                    NetPrice = item.net_price ?? 0,
+                    GrossPrice = item.gross_price ?? 0,
+                    Tax = item.tax ?? 0,
+
+                    NetSalePrice = item.net_sale_price,
+                    GrossSalePrice = item.gross_sale_price,
+                    SaleStart = saleStart,
+                    SaleEnd = saleEnd,
+
+                    OvipCategoryId = categoryId,
+                    ProductVariantId = item.product_variant_id
+                });
+
+                result.Updated++;
+                Log($"SUCCESS UPDATE ProductId={item.ovip_product_id}");
+            }
+        }
+        catch (Exception ex)
+        {
+            var baseError = ex.GetBaseException().Message;
+
+            Log($"ERROR ProductId={item.ovip_product_id}");
+            Log($"ERROR Message: {ex.Message}");
+            Log($"ERROR BaseException: {baseError}");
+            Log($"ERROR StackTrace: {ex.StackTrace}");
+
+            result.Errors.Add(
+                $"Product {item.ovip_product_id}: {baseError}"
+            );
+        }
+    }
+
+    var json = await CallPhpProxyAsync(
+        request: "getProducts",
+        extraData: extraData,
+        limitFrom: limitFrom,
+        limitTo: limitTo);
+
+    Log($"Raw JSON length: {json.Length}");
+
+    var products = Deserialize<List<OvipProductRemoteDto>>(json);
+
+    Log($"Products received from OVIP: {products.Count}");
+
+    var existingProducts = (await _productLogic.GetAllAsync())
+        .ToDictionary(x => x.OvipProductId);
+
+    Log($"Existing products count: {existingProducts.Count}");
+
+    foreach (var item in products)
+        await ProcessItemAsync(item, existingProducts);
+
+    Log("===== PRODUCT SYNC END =====");
+    Log($"Processed: {result.Processed}");
+    Log($"Created: {result.Created}");
+    Log($"Updated: {result.Updated}");
+    Log($"Errors: {result.Errors.Count}");
+    Log($"Warnings: {result.Warnings.Count}");
+
+    result.Logs = logs;
+
+    return JsonSerializer.Serialize(result, new JsonSerializerOptions
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true
+    });
+}
 
         public async Task<string> SyncCategoryConnectionsAsync()
         {
@@ -588,13 +692,15 @@ namespace Logic.Logic.Sync
         }
 
         private sealed class ProductSyncResult
-        {
-            public int Processed { get; set; }
-            public int Created { get; set; }
-            public int Updated { get; set; }
-            public List<string> Errors { get; set; } = new();
-            public List<string> Warnings { get; set; } = new();
-        }
+{
+    public int Processed { get; set; }
+    public int Created { get; set; }
+    public int Updated { get; set; }
+
+    public List<string> Errors { get; set; } = new();
+    public List<string> Warnings { get; set; } = new();
+    public List<string> Logs { get; set; } = new();
+}
 
         public async Task<string> CallPhpProxyAsync(
             string request,
@@ -642,5 +748,7 @@ namespace Logic.Logic.Sync
                 return body;
             }
         }
+        
     }
+    
 }
