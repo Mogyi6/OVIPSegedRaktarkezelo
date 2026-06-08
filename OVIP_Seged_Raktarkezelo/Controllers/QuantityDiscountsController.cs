@@ -44,7 +44,7 @@ namespace OVIP_Seged_Raktarkezelo.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] OvipQuantityDiscountUpdateDto discount)
         {
-            if (id != discount.Id)
+            if (id != discount.OvipQuantityId)
                 return BadRequest("Discount id in route does not match payload.");
 
             var updated = await _quantityDiscountLogic.UpdateAsync(discount);
