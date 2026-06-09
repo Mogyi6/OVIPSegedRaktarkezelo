@@ -26,6 +26,7 @@ using Repository.Repository.PricingRepository.Interfaces;
 using Repository.Repository.ProductsRepository;
 using Repository.Repository.ProductsRepository.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Diagnostics;
 
 
 
@@ -140,6 +141,34 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();       // <-- Swagger JSON
     app.UseSwaggerUI();     // <-- Swagger UI (böngészőben /swagger)
 }
+
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.ContentType = "application/json";
+
+        var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
+        var exception = exceptionHandlerPathFeature?.Error;
+
+        var response = new
+        {
+            title = "Server error",
+            detail = exception?.Message,
+            path = context.Request.Path,
+            trace = app.Environment.IsDevelopment() ? exception?.StackTrace : null
+        };
+
+        context.Response.StatusCode = exception switch
+        {
+            ArgumentException => StatusCodes.Status400BadRequest,
+            InvalidOperationException => StatusCodes.Status500InternalServerError,
+            _ => StatusCodes.Status500InternalServerError
+        };
+
+        await context.Response.WriteAsJsonAsync(response);
+    });
+});
 
 app.UseHttpsRedirection();
 

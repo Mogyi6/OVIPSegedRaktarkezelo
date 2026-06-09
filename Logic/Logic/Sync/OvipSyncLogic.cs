@@ -721,9 +721,12 @@ namespace Logic.Logic.Sync
 
             using var client = new System.Net.Http.HttpClient();
             var resp = await client.GetAsync(url);
-            resp.EnsureSuccessStatusCode();
-
             var body = await resp.Content.ReadAsStringAsync();
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                throw new Exception($"PHP backend call failed ({(int)resp.StatusCode} {resp.ReasonPhrase}): {body}");
+            }
 
             try
             {
