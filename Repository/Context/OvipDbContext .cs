@@ -77,6 +77,9 @@ namespace Repository.Context
                 entity.Property(x => x.ShortDescription).HasColumnType("longtext");
                 entity.Property(x => x.LongDescription).HasColumnType("longtext");
 
+                entity.Property(x => x.OvipCategoryId)
+                    .IsRequired(false);
+
                 entity.HasOne(x => x.MainCategory)
                     .WithMany()
                     .HasForeignKey(x => x.OvipCategoryId)

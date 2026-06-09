@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Models.JsonConverters;
 
 namespace Models.Dtos.Products
 {
@@ -61,7 +63,8 @@ namespace Models.Dtos.Products
         // =========================
         // KATEGÓRIA
         // =========================
-        public int OvipCategoryId { get; set; }
+        [JsonConverter(typeof(NullableIntFromStringJsonConverter))]
+        public int? OvipCategoryId { get; set; }
         // =========================
         // VARIÁNS AZ OVIP-TŐL
         // =========================

@@ -117,7 +117,7 @@ namespace Models.Entities.Products
         // KATEGÓRIÁK
         // =========================
 
-        public int OvipCategoryId { get; set; }
+        public int? OvipCategoryId { get; set; }
 
         public OvipCategory? MainCategory { get; set; }
 
