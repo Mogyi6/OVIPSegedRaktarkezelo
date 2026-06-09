@@ -32,7 +32,14 @@ namespace OVIP_Seged_Raktarkezelo.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] OvipProductCreateDto product)
         {
-            return Ok(await _productLogic.CreateAsync(product));
+            try
+            {
+                return Ok(await _productLogic.CreateAsync(product));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { error = ex.Message });
+            }
         }
 
         [HttpPut("{id}")]

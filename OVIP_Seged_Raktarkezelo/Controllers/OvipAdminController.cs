@@ -83,25 +83,35 @@ namespace OVIP_Seged_Raktarkezelo.Controllers
         [HttpGet("products/{id}")]
         public async Task<IActionResult> GetProduct(int id)
         {
-            return Ok(await _productLogic.GetByIdAsync(id));
+            var product = await _productLogic.GetByIdAsync(id);
+            return product == null ? NotFound() : Ok(product);
         }
 
         [HttpPost("products")]
         public async Task<IActionResult> CreateProduct(OvipProductCreateDto product)
         {
-            return Ok(await _productLogic.CreateAsync(product));
+            try
+            {
+                return Ok(await _productLogic.CreateAsync(product));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { error = ex.Message });
+            }
         }
 
         [HttpPut("products")]
         public async Task<IActionResult> UpdateProduct(OvipProductUpdateDto product)
         {
-            return Ok(await _productLogic.UpdateAsync(product));
+            var updated = await _productLogic.UpdateAsync(product);
+            return updated == null ? NotFound() : Ok(updated);
         }
 
         [HttpDelete("products/{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
-            return Ok(await _productLogic.DeleteAsync(id));
+            var deleted = await _productLogic.DeleteAsync(id);
+            return deleted ? Ok() : NotFound();
         }
 
         // =========================================================

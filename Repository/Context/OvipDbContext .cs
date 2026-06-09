@@ -131,7 +131,7 @@ namespace Repository.Context
                 entity.HasKey(x => x.Id);
 
                 entity.Property(x => x.Id)
-                    .ValueGeneratedNever();
+                    .ValueGeneratedOnAdd();
 
                 entity.HasIndex(x => new
                 {
@@ -265,7 +265,7 @@ namespace Repository.Context
                 entity.HasKey(x => x.Id);
 
                 entity.Property(x => x.Id)
-                    .ValueGeneratedNever();
+                    .ValueGeneratedOnAdd();
 
                 entity.HasOne(x => x.PriceList)
                     .WithMany(x => x.Prices)

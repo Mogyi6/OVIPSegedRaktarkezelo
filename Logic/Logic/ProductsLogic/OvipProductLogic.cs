@@ -25,6 +25,10 @@ namespace Logic.Logic.ProductsLogic
 
         public async Task<OvipProduct> CreateAsync(OvipProductCreateDto dto)
         {
+            var existing = await _repo.GetByIdAsync(dto.OvipProductId);
+            if (existing != null)
+                throw new InvalidOperationException($"Product already exists with id {dto.OvipProductId}.");
+
             var entity = _mapper.Map<OvipProduct>(dto);
 
             return await _repo.CreateAsync(entity);

@@ -491,20 +491,28 @@ namespace Logic.Logic.Sync
             var items = Deserialize<List<OvipCategoryConnectionRemoteDto>>(json);
 
             var existingConnections = await _categoryConnectionLogic.GetAllAsync();
+            var processedKeys = new HashSet<(int ProductId, int CategoryId)>(
+                existingConnections.Select(x => (x.OvipProductId, x.OvipCategoryId)));
 
             foreach (var item in items)
             {
+                var key = (item.ovip_product_id, item.ovip_category_id);
+                if (!processedKeys.Add(key))
+                    continue;
+
                 var existing = existingConnections.FirstOrDefault(x =>
                     x.OvipProductId == item.ovip_product_id &&
                     x.OvipCategoryId == item.ovip_category_id);
 
                 if (existing == null)
                 {
-                    await _categoryConnectionLogic.CreateAsync(new OvipCategoryConnectionCreateDto
+                    var created = await _categoryConnectionLogic.CreateAsync(new OvipCategoryConnectionCreateDto
                     {
                         OvipProductId = item.ovip_product_id,
                         OvipCategoryId = item.ovip_category_id
                     });
+
+                    existingConnections.Add(created);
                 }
                 else
                 {
@@ -525,18 +533,24 @@ namespace Logic.Logic.Sync
             var priceLists = Deserialize<List<OvipPriceListRemoteDto>>(json);
 
             var existingPrices = await _priceListPriceLogic.GetAllAsync();
+            var processedKeys = new HashSet<(int PriceListId, int ProductId)>(
+                existingPrices.Select(x => (x.OvipPriceListId, x.OvipProductId)));
 
             foreach (var priceList in priceLists)
             {
                 foreach (var price in priceList.price_list_prices)
                 {
+                    var key = (priceList.price_list_ovip_id, price.ovip_product_id);
+                    if (!processedKeys.Add(key))
+                        continue;
+
                     var existing = existingPrices.FirstOrDefault(x =>
                         x.OvipPriceListId == priceList.price_list_ovip_id &&
                         x.OvipProductId == price.ovip_product_id);
 
                     if (existing == null)
                     {
-                        await _priceListPriceLogic.CreateAsync(new OvipPriceListPriceCreateDto
+                        var created = await _priceListPriceLogic.CreateAsync(new OvipPriceListPriceCreateDto
                         {
                             OvipPriceListId = priceList.price_list_ovip_id,
                             OvipProductId = price.ovip_product_id,
@@ -548,6 +562,8 @@ namespace Logic.Logic.Sync
                             SaleStart = ParseNullableDate(price.sale_start),
                             SaleEnd = ParseNullableDate(price.sale_end)
                         });
+
+                        existingPrices.Add(created);
                     }
                     else
                     {
