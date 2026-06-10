@@ -265,7 +265,7 @@ namespace Repository.Mappings
 
             // CREATE DTO -> ENTITY
             CreateMap<OvipCategoryConnectionCreateDto, OvipCategoryConnection>()
-                .ForMember(x => x.Id, opt => opt.MapFrom(x => x.Id))
+                .ForMember(x => x.Id, opt => opt.Ignore())
                 .ForMember(x => x.Product, opt => opt.Ignore())
                 .ForMember(x => x.Category, opt => opt.Ignore());
 
