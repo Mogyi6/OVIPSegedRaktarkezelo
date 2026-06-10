@@ -5,10 +5,12 @@ services:
       dockerfile: OVIP_Seged_Raktarkezelo/Dockerfile
     ports:
       - "8080:8080"
-    depends_on:
-      - db
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-
       ConnectionStrings__DefaultConnection: Server=db;Port=3306;Database=${MYSQL_DATABASE};User=root;Password=${MYSQL_ROOT_PASSWORD}
+
+networks:
+  default:
+    external: true
+    name: app-network
