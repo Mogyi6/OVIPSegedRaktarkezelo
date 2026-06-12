@@ -66,11 +66,9 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
+
     app.UseSwagger();       // <-- Swagger JSON
     app.UseSwaggerUI();     // <-- Swagger UI (böngészőben /swagger)
-}
 
 app.UseExceptionHandler(errorApp =>
 {
