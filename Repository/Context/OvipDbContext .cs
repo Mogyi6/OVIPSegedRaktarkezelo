@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Models.Entities;
 using Models.Entities.Categories;
 using Models.Entities.Manufacture;
 using Models.Entities.Parameters;
@@ -25,7 +26,7 @@ namespace Repository.Context
         // =========================
         // CATEGORIES
         // =========================
-        public DbSet<OvipCategory> Categories { get; set; }
+        public DbSet<Category> Categories { get; set; }
         public DbSet<OvipCategoryConnection> CategoryConnections { get; set; }
 
         // =========================

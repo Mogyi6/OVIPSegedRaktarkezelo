@@ -1,13 +1,14 @@
-﻿using Models.Entities.Categories;
+﻿using Models.Entities;
+using Models.Entities.Categories;
 
 namespace Repository.Repository.CategoriesRepository.Interfaces
 {
     public interface IOvipCategoryRepository
     {
-        Task<OvipCategory> CreateAsync(OvipCategory entity);
+        Task<Category> CreateAsync(Category entity);
         Task<bool> DeleteAsync(int id);
-        Task<List<OvipCategory>> GetAllAsync();
-        Task<OvipCategory?> GetByIdAsync(int id);
-        Task<OvipCategory?> UpdateAsync(OvipCategory entity);
+        Task<List<Category>> GetAllAsync();
+        Task<Category?> GetByIdAsync(int id);
+        Task<Category?> UpdateAsync(Category entity);
     }
 }

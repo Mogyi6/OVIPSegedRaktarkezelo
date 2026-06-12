@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Models.Entities;
 using Models.Entities.Categories;
 using Repository.Context;
 using Repository.Repository.CategoriesRepository.Interfaces;
@@ -22,7 +23,7 @@ namespace Repository.Repository.CategoriesRepository
         // =========================
         // Összes kategória
         // =========================
-        public async Task<List<OvipCategory>> GetAllAsync()
+        public async Task<List<Category>> GetAllAsync()
         {
             return await _context.Categories
                 .Include(x => x.ParentCategory)
@@ -34,7 +35,7 @@ namespace Repository.Repository.CategoriesRepository
         // =========================
         // ID alapján
         // =========================
-        public async Task<OvipCategory?> GetByIdAsync(int id)
+        public async Task<Category?> GetByIdAsync(int id)
         {
             return await _context.Categories
                 .Include(x => x.ParentCategory)
@@ -46,7 +47,7 @@ namespace Repository.Repository.CategoriesRepository
         // =========================
         // Létrehozás
         // =========================
-        public async Task<OvipCategory> CreateAsync(OvipCategory entity)
+        public async Task<Category> CreateAsync(Category entity)
         {
             await _context.Categories.AddAsync(entity);
             await _context.SaveChangesAsync();
@@ -56,7 +57,7 @@ namespace Repository.Repository.CategoriesRepository
         // =========================
         // Módosítás
         // =========================
-        public async Task<OvipCategory?> UpdateAsync(OvipCategory entity)
+        public async Task<Category?> UpdateAsync(Category entity)
         {
             var existing = await _context.Categories
                 .FirstOrDefaultAsync(x => x.OvipCategoryId == entity.OvipCategoryId);

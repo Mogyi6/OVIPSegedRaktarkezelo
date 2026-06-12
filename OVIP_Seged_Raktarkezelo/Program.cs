@@ -10,10 +10,16 @@ using Logic.Logic.PricingLogic.Interfaces;
 using Logic.Logic.ProductsLogic;
 using Logic.Logic.ProductsLogic.Interfaces;
 using Logic.Logic.Sync;
+using Logic.Logics.Entities_Logic;
+using Logic.Logics.Entities_Logic.Entities_Logic_Interfaces;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Models.SOAPClient;
 using Repository.Context;
 using Repository.Mappings;
+using Repository.Repositories.Entities_Repository;
+using Repository.Repositories.Entities_Repository.Entities_Repository_Interfaces;
 using Repository.Repository;
 using Repository.Repository.CategoriesRepository;
 using Repository.Repository.CategoriesRepository.Interfaces;
@@ -25,8 +31,6 @@ using Repository.Repository.PricingRepository;
 using Repository.Repository.PricingRepository.Interfaces;
 using Repository.Repository.ProductsRepository;
 using Repository.Repository.ProductsRepository.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.AspNetCore.Diagnostics;
 
 
 
@@ -56,6 +60,12 @@ builder.Services.AddDbContext<OvipDbContext>(options =>
         }
     );
 });
+
+builder.Services.AddScoped<ICategory_Repository, Category_Repository>();
+
+builder.Services.AddScoped<ICategory_Logic, Category_Logic>();
+
+
 
 builder.Services.Configure<OvipOptions>(
     builder.Configuration.GetSection("Ovip"));

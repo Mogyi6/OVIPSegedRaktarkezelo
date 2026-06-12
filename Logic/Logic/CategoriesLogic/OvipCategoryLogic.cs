@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Logic.Logic.CategoriesLogic.Interfaces;
 using Models.Dtos.Categories;
+using Models.Entities;
 using Models.Entities.Categories;
 using Repository.Repository.CategoriesRepository.Interfaces;
 
@@ -17,25 +18,25 @@ namespace Logic.Logic.CategoriesLogic
             _mapper = mapper;
         }
 
-        public Task<List<OvipCategory>> GetAllAsync()
+        public Task<List<Category>> GetAllAsync()
             => _repo.GetAllAsync();
 
-        public Task<OvipCategory?> GetByIdAsync(int id)
+        public Task<Category?> GetByIdAsync(int id)
             => _repo.GetByIdAsync(id);
 
         // =========================
         // CREATE
         // =========================
-        public async Task<OvipCategory> CreateAsync(OvipCategoryCreateDto dto)
+        public async Task<Category> CreateAsync(OvipCategoryCreateDto dto)
         {
-            var entity = _mapper.Map<OvipCategory>(dto);
+            var entity = _mapper.Map<Category>(dto);
             return await _repo.CreateAsync(entity);
         }
 
         // =========================
         // UPDATE
         // =========================
-        public async Task<OvipCategory?> UpdateAsync(OvipCategoryUpdateDto dto)
+        public async Task<Category?> UpdateAsync(OvipCategoryUpdateDto dto)
         {
             var existing = await _repo.GetByIdAsync(dto.OvipCategoryId);
 
