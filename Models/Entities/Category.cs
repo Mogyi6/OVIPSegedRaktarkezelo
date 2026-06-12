@@ -1,5 +1,4 @@
-﻿using Models.Entities.Categories;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -29,10 +28,10 @@ namespace Models.Entities
 
         // NAVIGATION
 
-        public OvipCategory? ParentCategory { get; set; }
+        public Category? ParentCategory { get; set; }
 
-        public List<OvipCategory> Children { get; set; } = [];
+        public List<Category> Children { get; set; } = [];
 
-        public List<OvipCategoryConnection> Products { get; set; } = [];
+        //public List<OvipCategoryConnection> Products { get; set; } = [];
     }
 }

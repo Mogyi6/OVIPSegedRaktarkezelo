@@ -1,15 +1,3 @@
-
-using Logic.Logic.CategoriesLogic;
-using Logic.Logic.CategoriesLogic.Interfaces;
-using Logic.Logic.ManufactureLogic;
-using Logic.Logic.ManufactureLogic.Interfaces;
-using Logic.Logic.ParametersLogic;
-using Logic.Logic.ParametersLogic.Interfaces;
-using Logic.Logic.PricingLogic;
-using Logic.Logic.PricingLogic.Interfaces;
-using Logic.Logic.ProductsLogic;
-using Logic.Logic.ProductsLogic.Interfaces;
-using Logic.Logic.Sync;
 using Logic.Logics.Entities_Logic;
 using Logic.Logics.Entities_Logic.Entities_Logic_Interfaces;
 using Microsoft.AspNetCore.Diagnostics;
@@ -17,20 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Models.SOAPClient;
 using Repository.Context;
-using Repository.Mappings;
+
 using Repository.Repositories.Entities_Repository;
 using Repository.Repositories.Entities_Repository.Entities_Repository_Interfaces;
-using Repository.Repository;
-using Repository.Repository.CategoriesRepository;
-using Repository.Repository.CategoriesRepository.Interfaces;
-using Repository.Repository.ManufactureRepositroy;
-using Repository.Repository.ManufactureRepositroy.Interfaces;
-using Repository.Repository.ParametersRepositroy;
-using Repository.Repository.ParametersRepositroy.Interfaces;
-using Repository.Repository.PricingRepository;
-using Repository.Repository.PricingRepository.Interfaces;
-using Repository.Repository.ProductsRepository;
-using Repository.Repository.ProductsRepository.Interfaces;
+
 
 
 
@@ -69,64 +47,6 @@ builder.Services.AddScoped<ICategory_Logic, Category_Logic>();
 
 builder.Services.Configure<OvipOptions>(
     builder.Configuration.GetSection("Ovip"));
-
-
-builder.Services.AddScoped<Logic.Logic.Sync.IOvipSyncLogic, Logic.Logic.Sync.OvipSyncLogic>();
-
-
-// =========================
-// PRODUCTS
-// =========================
-builder.Services.AddTransient<IOvipProductRepository, OvipProductRepository>();
-builder.Services.AddTransient<IOvipProductImageRepository, OvipProductImageRepository>();
-builder.Services.AddTransient<IOvipProductParameterRepository, OvipProductParameterRepository>();
-builder.Services.AddTransient<IOvipStockRepository, OvipStockRepository>();
-
-builder.Services.AddScoped<IOvipProductLogic, OvipProductLogic>();
-builder.Services.AddScoped<IOvipProductImageLogic, OvipProductImageLogic>();
-builder.Services.AddScoped<IOvipProductParameterLogic, OvipProductParameterLogic>();
-builder.Services.AddScoped<IOvipStockLogic, OvipStockLogic>();
-
-// =========================
-// CATEGORIES
-// =========================
-builder.Services.AddTransient<IOvipCategoryRepository, OvipCategoryRepository>();
-builder.Services.AddTransient<IOvipCategoryConnectionRepository, OvipCategoryConnectionRepository>();
-
-builder.Services.AddScoped<IOvipCategoryLogic, OvipCategoryLogic>();
-builder.Services.AddScoped<IOvipCategoryConnectionLogic, OvipCategoryConnectionLogic>();
-
-// =========================
-// PARAMETERS
-// =========================
-builder.Services.AddTransient<IOvipParameterRepository, OvipParameterRepository>();
-
-builder.Services.AddScoped<IOvipParameterLogic, OvipParameterLogic>();
-
-// =========================
-// PRICING
-// =========================
-builder.Services.AddTransient<IOvipPriceListRepository, OvipPriceListRepository>();
-builder.Services.AddTransient<IOvipPriceListPriceRepository, OvipPriceListPriceRepository>();
-builder.Services.AddTransient<IOvipQuantityDiscountRepository, OvipQuantityDiscountRepository>();
-
-builder.Services.AddScoped<IOvipPriceListLogic, OvipPriceListLogic>();
-builder.Services.AddScoped<IOvipPriceListPriceLogic, OvipPriceListPriceLogic>();
-builder.Services.AddScoped<IOvipQuantityDiscountLogic, OvipQuantityDiscountLogic>();
-
-// =========================
-// MANUFACTURE
-// =========================
-builder.Services.AddTransient<IOvipManufactureRepository, OvipManufactureRepository>();
-builder.Services.AddTransient<IOvipManufacturePartRepository, OvipManufacturePartRepository>();
-
-builder.Services.AddScoped<IOvipManufactureLogic, OvipManufactureLogic>();
-builder.Services.AddScoped<IOvipManufacturePartLogic, OvipManufacturePartLogic>();
-
-builder.Services.AddAutoMapper(cfg =>
-{
-    cfg.AddProfile<OvipProductProfile>();
-});
 
 // Swagger setup
 builder.Services.AddEndpointsApiExplorer();
